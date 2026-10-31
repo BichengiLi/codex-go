@@ -92,7 +92,15 @@ export class CodexService extends EventEmitter {
       });
       // This cache only bridges notifications and durable history, not all history.
       if (turns.size > 30) turns.delete(turns.keys().next().value!);
-    } else if (p.turnId) {
+    } else if (
+      p.turnId &&
+      [
+        "item/started",
+        "item/completed",
+        "item/agentMessage/delta",
+        "item/commandExecution/outputDelta",
+      ].includes(msg.method)
+    ) {
       const turn: Turn = turns.get(p.turnId) ?? {
         id: p.turnId,
         status: "inProgress",

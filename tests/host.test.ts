@@ -231,6 +231,29 @@ test("active first-turn events remain readable while the new rollout file is emp
   assert.equal(response.json().active, true);
   assert.equal(response.json().thread.turns[0].items[0].text, "live output");
 });
+
+test("resume token-usage notifications do not invent an empty active turn or replace completed history", async (t) => {
+  const { app, projectId, rpc, service } = await setup();
+  t.after(() => app.close());
+  const turnId = randomUUID();
+  rpc.turns = [
+    {
+      id: turnId,
+      status: "completed",
+      items: [{ id: "reply", type: "agentMessage", text: "completed output" }],
+    },
+  ];
+  await service.list(projectId);
+  await service.resume(rpc.threadId);
+  rpc.emit("message", {
+    method: "thread/tokenUsage/updated",
+    params: { threadId: rpc.threadId, turnId, tokenUsage: {} },
+  });
+  const state = await service.read(rpc.threadId);
+  assert.equal(state.active, false);
+  assert.equal(state.thread.turns[0].status, "completed");
+  assert.equal(state.thread.turns[0].items[0].text, "completed output");
+});
 async function setup() {
   const dir = await temp(),
     workspace = path.join(dir, "workspaces");
