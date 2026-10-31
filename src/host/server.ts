@@ -29,6 +29,11 @@ export async function createServer(options: {
   const { service, pairing } = options;
   const files = new ProjectFiles(service.projects, options.privatePaths);
   const deviceStreams = new Map<string, Set<() => void>>();
+  const revoked = (deviceId: string) => {
+    for (const close of deviceStreams.get(deviceId) ?? []) close();
+  };
+  pairing.on("revoked", revoked);
+  app.addHook("onClose", async () => { pairing.off("revoked", revoked); });
   app.addHook("onRequest", async (request, reply) => {
     reply.header("Cache-Control", "no-store");
     reply.header("X-Content-Type-Options", "nosniff");
@@ -109,7 +114,7 @@ export async function createServer(options: {
     );
     reply.header(
       "Set-Cookie",
-      `${cookieName}=${credential}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800${options.secure ? "; Secure" : ""}`,
+      `${cookieName}=${credential}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${paired.expiresAt === null ? 34560000 : 604800}${options.secure || req.headers.origin?.startsWith("https://") ? "; Secure" : ""}`,
     );
     return { id: paired.id };
   });
@@ -125,7 +130,6 @@ export async function createServer(options: {
   app.delete("/api/devices/:id", async (req) => {
     const { id: deviceId } = z.object({ id: z.string() }).parse(req.params);
     await pairing.revoke(deviceId);
-    for (const close of deviceStreams.get(deviceId) ?? []) close();
     return { ok: true };
   });
   app.post("/api/projects", async (req) => {

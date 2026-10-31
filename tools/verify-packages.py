@@ -57,10 +57,11 @@ def main():
             assert hashlib.sha256(apk.read('lib/arm64-v8a/' + name)).hexdigest() == expected, name
     with zipfile.ZipFile(RELEASE / 'Codex-Go-0.2.0-Windows-x64.zip') as windows:
         assert windows.testzip() is None, 'Windows ZIP CRC error'
-        for name in ['resources/web/index.html', 'resources/cloudflared.exe',
+        for name in ['resources/web/index.html', 'resources/agent.mjs', 'resources/cloudflared.exe',
                      'resources/codex/bin/codex.exe', 'resources/THIRD_PARTY_NOTICES.md']:
             assert name in windows.namelist(), name
         assert windows.read('resources/web/index.html') == (ROOT / 'dist/web/index.html').read_bytes()
+        assert windows.read('resources/agent.mjs') == (ROOT / 'dist/native/resources/agent.mjs').read_bytes()
         assert hashlib.sha256(windows.read('resources/cloudflared.exe')).hexdigest() == '2493dbc168923bb3e59e5e7716f71deced92992eea9acd6e9d74f84ac7751343'
     names = ['Codex-Go-0.2.0-Windows-x64.exe', 'Codex-Go-0.2.0-Windows-x64.zip', 'Codex-Go-0.2.0-Android-arm64.apk']
     artifacts = [{'name': name, 'bytes': (RELEASE / name).stat().st_size,

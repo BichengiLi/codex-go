@@ -1,6 +1,6 @@
 # Codex Go 二次开发交接
 
-本文件是开发交接主文档，标准自动发现入口为 [AGENTS.md](AGENTS.md)。下面的状态基线为 **2026-10-31 / 0.2.0 原型**；开始新任务时以当前源码、锁文件、CI 和设备实测更新判断。
+本文件是开发交接主文档，标准自动发现入口为 [AGENTS.md](AGENTS.md)。下面的状态基线为 **2026-10-31 / 0.2.0 双端体验更新**；开始新任务时以当前源码、锁文件、CI 和设备实测更新判断。
 
 ## 先建立上下文
 
@@ -21,11 +21,11 @@
 
 用户使用自己的 API 服务在手机上开发；手机既能连接电脑上已有的 Codex 项目和空闲会话，也有独立本地环境。模型服务需兼容 Codex 的 Responses 接口，当前没有 Chat Completions 转换或离线模型推理。
 
-当前采用官方固定版本 Codex CLI 的 `app-server --listen stdio://`，没有维护 CLI 分叉。Windows Electron App 管理主机和连接码；Android Java Activity/前台服务管理连接与本地 Linux 用户态；两端共用 React 项目/会话界面，日常使用无需外部浏览器。
+当前采用官方固定版本 Codex CLI 的 `app-server --listen stdio://`，没有维护 CLI 分叉。Windows Electron 控制页通过受鉴权本机管道管理独立后台主机，默认开启外网，窗口退出后后台继续；Android Java Activity 提供扫码和 API 模型选择，前台服务管理本地 Linux 用户态；两端共用 React 项目/会话界面，日常使用无需外部浏览器。
 
-基线已验证：18 项自动化测试、TypeScript/生产构建、Windows 安装程序/ZIP、Android APK 构建/lint/签名和包内容校验，真实模型多轮文件修改及恢复，公网 HTTPS 配对和模型事件轮询。Windows/Ubuntu/Android CI 通过。具体证据以验证记录为准。
+基线已验证：21 项主机/后台自动化测试、2 项 Android 模型配置单元测试、TypeScript/生产构建、Windows 安装程序/ZIP、Android APK 构建/lint/签名和包内容校验，真实模型多轮文件修改及恢复，公网 HTTPS 配对和模型事件轮询。Windows/Ubuntu/Android CI 通过。具体证据以验证记录为准。
 
-**设备验收仍有缺口**：Android 配对、文件保存、PRoot 启动、工具执行和后台恢复尚未实机验证；最终 Windows 包也未完成全面界面验收。原有桌面会话可发现和读取，但其他进程中的活动任务不能直接接管；桌面与手机交替写入同一会话的完整往返仍待验收。仓库克隆、任务补充指令、跨主机文件/会话迁移和 iOS 是后续工作。构建成功不能替代这些结论。
+**设备验收仍有缺口**：Android 配对、文件保存、PRoot 启动、工具执行和后台恢复尚未实机验证；新版 Windows 开发界面已检查首页、下滑二维码和界面退出后的公网配对；最终安装后全面验收仍待完成。原有桌面会话可发现和读取，但其他进程中的活动任务不能直接接管；桌面与手机交替写入同一会话的完整往返仍待验收。仓库克隆、任务补充指令、跨主机文件/会话迁移和 iOS 是后续工作。构建成功不能替代这些结论。
 
 ## 架构入口
 
@@ -45,8 +45,8 @@ Windows Electron / Android 内置 React 界面
 | `src/host/projects.ts`、`files.ts`、`storage.ts`               | realpath 项目授权、桌面项目导入、鉴权文件交付与 JSON 状态存储。                                                                                                                                  |
 | `src/shared/`                                                  | 跨端业务类型与 `CG1.…` 连接码格式。Android 的 `HostConnection.java` 也实现连接码解析，改格式时同步。                                                                                             |
 | `src/web/main.tsx`、`panels.tsx`、`api.ts`、`native.ts`        | 共享界面与权限/文件面板、HTTP 或原生请求桥、SSE/事件轮询。                                                                                                                                       |
-| `src/desktop/main.ts`、`preload.ts`、`renderer.js`             | Electron 主进程、受限 IPC、电脑控制页。渲染进程保持隔离及 sandbox。                                                                                                                              |
-| `apps/android/app/src/main/java/io/github/bichengili/codexgo/` | `MainActivity`：主机选择及可信 WebView 桥；`HostConnection`：网络/凭据；`Vault`：Keystore；`EngineService`：前台进程生命周期；`RuntimeInstaller`：校验/事务安装；`Compat`：旧 Android API 兼容。 |
+| `src/desktop/main.ts`、`agent.ts`、`control.ts`、`renderer.js`             | Electron 控制页、独立后台进程、带随机凭据的本机控制管道和二维码。渲染进程保持隔离及 sandbox。                                                                                                                              |
+| `apps/android/app/src/main/java/io/github/bichengili/codexgo/` | `MainActivity`：主机选择及可信 WebView 桥；`ScanActivity`：原生扫码；`ModelProvider`：HTTPS 模型发现；`HostConnection`：网络/凭据；`Vault`：Keystore；`EngineService`：前台进程生命周期；`RuntimeInstaller`：校验/事务安装；`Compat`：旧 Android API 兼容。 |
 | `tools/`、`runtime/`、`protocol/`                              | 构建/真实探针/包校验、下载输入锁与来源、固定 CLI 生成的协议子集。版本事实读取对应文件。                                                                                                          |
 
 ## 最小开发与验证

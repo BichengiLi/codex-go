@@ -300,7 +300,7 @@ function App() {
             return { ...old, active: true, thread: { ...old.thread, turns } };
           });
         } else if (event.method === "bridge/unsupported")
-          setNotice("任务请求了当前原型尚不支持的交互，主机已返回错误。");
+          setNotice("此操作需要暂不支持的交互，主机已返回错误。");
         else refresh();
       });
       stream.onerror = () => {
@@ -470,7 +470,7 @@ function App() {
             <Icon name="code" size={22} />
           </span>
           Codex <span>Go</span>
-          <span className="alpha">PREVIEW</span>
+
         </a>
         <button
           className="host-card"

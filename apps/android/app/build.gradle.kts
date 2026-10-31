@@ -21,3 +21,8 @@ android {
     lint { disable += "ExpiredTargetSdkVersion" }
 }
 tasks.withType<JavaCompile>().configureEach { options.encoding = "UTF-8" }
+dependencies {
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
+}

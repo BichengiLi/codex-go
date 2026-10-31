@@ -21,7 +21,7 @@ Codex Go 希望把模型服务、开发运行环境和手机界面连接起来�
 
 ## 当前状态
 
-**0.2.0 已提供 Windows App 和 Android APK 原型，支持连接码与手机本地模式。** 日常流程见[双端 App 使用指南](docs/native-apps.md)。命令行/网页入口继续用于开发与协议验证。
+**0.2.0 提供 Windows App 和 Android APK，新增渐入首页、扫码配对、独立后台连接和本地 API 模型选择。** 日常流程见[双端 App 使用指南](docs/native-apps.md)。命令行/网页入口继续用于开发与协议验证。
 
 支持短时配对、设备撤销、导入 Codex App 已有项目、创建空项目、新建/接续会话、历史分页、流式输出、生成文件下载、命令/文件审批、会话权限调整、任务停止和断线状态恢复。任务提交使用持久化请求标识，结果未知时不会自动重跑。模型配置复用主机 Codex，或使用主机环境变量指定 Responses 服务。
 
@@ -54,7 +54,7 @@ npm run probe -- --run --output .local/probe.json
 
 参考启发本项目的 [dsh-Go](https://github.com/ccch1mneyyy/dsh-Go)，采用“手机本地 + 远程主机”的产品方向，让同一套项目与会话界面适配不同运行环境。
 
-Windows 使用 Electron 管理主机、连接码与临时外网隧道。Android 原生 Activity/前台服务管理连接、加密凭据、文件保存及校验安装的 ARM64 Linux 用户态，App 内共用项目与会话界面。本地运行包含 Node、Git 和固定版本 Codex；PRoot 提供兼容环境，系统隔离由 Android App 提供。手机本地运行尚需设备验收。
+Windows 的独立后台进程管理主机与默认开启的临时 HTTPS 隧道，Electron 提供渐入首页、扫码配对及连接控制。关闭电脑界面后服务继续运行。Android 原生 Activity 提供扫码连接与 API 模型获取/选择；前台服务管理手机本地运行，并提供加密凭据、文件保存和经过校验安装的 ARM64 Linux 用户态，App 内共用项目与会话界面。本地运行包含 Node、Git 和固定版本 Codex；PRoot 提供兼容环境，系统隔离由 Android App 提供。手机本地运行尚需设备验收。
 
 电脑与常驻主机模式通过连接服务调用 Codex App Server；手机本地模式也优先探索同一协议。先验证公开接口能否满足需求，再决定是否需要维护 Codex CLI 的修改版本。
 

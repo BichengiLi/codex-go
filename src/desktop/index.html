@@ -11,66 +11,96 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
+    <div class="ambient" aria-hidden="true"></div>
+    <header class="topbar">
+      <a href="#home" class="wordmark"><span class="mark">C↗</span> CODEX GO</a
+      ><span id="status" class="status" role="status">正在准备连接</span>
+    </header>
     <main>
-      <header>
-        <span class="logo">C↗</span><span>CODEX GO <small>电脑端</small></span
-        ><span id="status" class="status">尚未启动</span>
-      </header>
-      <section class="intro">
-        <div class="eyebrow">YOUR WORK. WITH YOU.</div>
-        <h1>从电脑出发，<br />在手机继续。</h1>
-        <p>选择项目目录，启动服务，把连接码粘贴到 Android App。</p>
-      </section>
-      <section class="card">
-        <div class="row">
-          <h2>01 / 项目目录</h2>
-          <button data-action="workspace" class="quiet">选择目录</button>
+      <section id="home" class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow entrance">YOUR WORK. WITH YOU.</p>
+          <h1 class="entrance">
+            Codex <em>Go</em><span class="title-dot">.</span>
+          </h1>
+          <p class="tagline entrance">灵感在路上，开发也可以。</p>
+          <p class="hero-note entrance">从电脑出发，在任何地方继续。</p>
         </div>
-        <p id="workspace" class="path"></p>
-        <p class="hint">
-          连接后，也可以从「Codex App 项目」选择电脑上已有的项目。
-        </p>
+        <a href="#connect" class="scroll-cue entrance"
+          ><span>连接移动设备，请下滑</span
+          ><span class="scroll-line" aria-hidden="true">↓</span></a
+        >
+        <span class="hero-index">01 — YOUR NEXT CHAPTER</span>
       </section>
-      <section class="card">
-        <div class="row">
-          <h2>02 / 连接手机</h2>
-          <span id="expiry" class="hint"></span>
-        </div>
-        <textarea
-          id="code"
-          readonly
-          placeholder="启动后在这里显示连接码"
-        ></textarea>
-        <div class="buttons">
-          <button data-action="start" id="start" class="primary">
-            启动服务</button
-          ><button data-action="copy" id="copy">复制连接码</button
-          ><button data-action="refresh" id="refresh" class="quiet">刷新</button
-          ><button data-action="stop" id="stop" class="quiet">停止</button>
-        </div>
-        <p class="hint">
-          连接码有效期 5 分钟，仅可配对一次。配对成功后可直接重连。
-        </p>
-      </section>
-      <section class="card">
-        <div class="row">
-          <div>
-            <h2>03 / 跨网络连接</h2>
-            <p class="hint">
-              外网连接经 Cloudflare 临时隧道转发。请保持电脑 App 运行。
-            </p>
+      <section id="connect" class="connect-section reveal">
+        <div class="section-heading">
+          <p class="eyebrow">A SMALL SCAN. A BIG POSSIBILITY.</p>
+          <h2>工作现场，<br /><span>随你而行。</span></h2>
+          <p>
+            打开手机端 Codex Go，点击「连接电脑」。<br />扫一下，继续你的项目和对话。
+          </p>
+          <div class="connection-note">
+            <i></i>关闭电脑窗口后，连接服务仍在后台运行。
           </div>
-          <button data-action="internet" id="internet">开启外网</button>
         </div>
-        <p id="address" class="path"></p>
+        <div class="pair-card">
+          <div class="card-top">
+            <span>连接你的手机</span><span id="expiry" class="muted"></span>
+          </div>
+          <div class="qr-frame">
+            <canvas
+              hidden
+              id="qr"
+              aria-label="手机配对二维码"
+              role="img"
+            ></canvas>
+            <div id="qr-placeholder">正在准备安全连接…</div>
+          </div>
+          <p id="address" class="address"></p>
+          <div class="pair-actions">
+            <button data-action="refresh" id="refresh">↻ 刷新二维码</button
+            ><button data-action="copy" id="copy">复制连接码 ↗</button>
+          </div>
+          <p class="fine">扫码后保存连接 · 二维码 5 分钟内有效</p>
+          <p id="error" class="error" role="alert"></p>
+          <button data-action="internet" id="internet" class="text-button">
+            重试外网连接
+          </button>
+        </div>
       </section>
-      <footer>
-        <button data-action="chat" id="chat" class="quiet">
-          在电脑上打开项目 ↗</button
-        ><span>复用本机 Codex 的模型与登录配置</span>
-      </footer>
-      <p id="error" role="alert"></p>
+      <section class="settings-section reveal">
+        <details>
+          <summary>连接与项目设置 <span>＋</span></summary>
+          <div class="settings-content">
+            <div class="setting-row">
+              <div>
+                <h3>项目目录</h3>
+                <p id="workspace" class="path"></p>
+              </div>
+              <button data-action="workspace">选择目录 ↗</button>
+            </div>
+            <div class="setting-row">
+              <div>
+                <h3>电脑服务</h3>
+                <p class="muted">你可以主动断开所有移动设备的连接。</p>
+              </div>
+              <button data-action="start" id="start">启动连接</button
+              ><button data-action="stop" id="stop" class="danger">
+                断开连接
+              </button>
+            </div>
+            <h3>已配对设备</h3>
+            <div id="devices" class="devices"></div>
+          </div>
+        </details>
+      </section>
     </main>
+    <footer>
+      <span>自己的 API · 自己的项目 · 随时接续</span
+      ><button data-action="chat" id="chat" class="text-button">
+        在电脑上打开项目 ↗
+      </button>
+    </footer>
     <script src="renderer.js"></script>
   </body>
 </html>

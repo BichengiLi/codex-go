@@ -53,3 +53,13 @@
 - Windows/Android 安装包、原生主机切换与 Android 加密模型配置已实现。仓库克隆、跨主机文件/会话迁移、补充指令、完整差异审阅、模型服务错误分类和 iOS 尚未实现。
 
 官方协议依据：[App Server](https://developers.openai.com/codex/app-server/)、[高级配置](https://developers.openai.com/codex/config-advanced/)。实际实现以本机生成的协议为准。
+
+## 双端体验与后台连接更新
+
+- 21 项 Node 测试通过，新增启动者退出后的后台存活、控制管道鉴权、消费后的二维码更新、持久设备凭据、升级延续与撤销；原有 HTTP/SSE、权限、文件与防重复提交测试保持通过。
+- Android 新增 2 项 JUnit 测试，验证模型 API 地址、重复/无效模型过滤与错误响应；`testDebugUnitTest / assembleDebug / lintDebug` 通过。
+- Windows 新版开发界面完成实际 Electron 渲染检查：外网自动就绪、二维码可见、无横向溢出、无控制台错误，渲染后的二维码经 ZXing 实际解码为 CG1。390px 共享聊天起始页无横向溢出或控制台错误。退出 Electron 窗口后，独立后台通过原公网 HTTPS 地址完成新手机配对（200）、鉴权读取（200），撤销后读取返回 401；没有发送模型任务。
+- 本机原始检查记录：`.local/experience-ui-result.json`、`.local/experience-lifecycle-result.json`，截图位于 `.local/experience-desktop-*.png`。这些运行产物不提交。
+- Windows 打包版主界面进程结束后，后台仍在线，进程 ID 和原 HTTPS 地址保持不变；独立状态目录记录于 `.local/experience-packaged-result.json`。测试后台与隧道均已清理。
+- 新安装包输出在 `.local/releases/experience-refresh/`，保留之前交付目录。EXE、ZIP、APK 的内容、运行环境与主机 bundle 一致性、CRC、哈希检查通过；APK v2 签名验证通过。该目录保存 `release-manifest.json` 和 `SHA256SUMS.txt`。
+- 未连接 Android 设备；相机扫码、厂商后台策略、PRoot 执行和休眠恢复仍需真机验收。模型发现只有本地响应解析测试，未使用用户真实 Key 访问 `/models`，不据此宣称所有 API 服务或模型兼容。

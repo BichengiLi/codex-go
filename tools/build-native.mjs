@@ -53,10 +53,18 @@ await build({
   format: "cjs",
   outfile: root + "/host.cjs",
 });
-for (const name of ["index.html", "style.css", "renderer.js"])
+await build({
+  entryPoints: ["src/desktop/agent.ts"], bundle: true, platform: "node", format: "esm",
+  outfile: root + "/resources/agent.mjs",
+  banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
+});
+await build({ entryPoints: ["src/desktop/renderer.js"], bundle: true, platform: "browser", outfile: root + "/renderer.js" });
+for (const name of ["index.html", "style.css"])
   await cp("src/desktop/" + name, root + "/" + name);
 await cp("dist/web", root + "/resources/web", { recursive: true });
 await cp("runtime/NOTICE.md", root + "/resources/THIRD_PARTY_NOTICES.md");
+await mkdir(root + "/resources/licenses", { recursive: true });
+await cp("node_modules/qrcode/license", root + "/resources/licenses/qrcode-LICENSE.txt");
 await mkdir("apps/android/app/src/main/assets/licenses", { recursive: true });
 await cp(
   "runtime/NOTICE.md",

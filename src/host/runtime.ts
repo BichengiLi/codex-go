@@ -17,8 +17,10 @@ export async function startHost(options: {
   port?: number;
   publicUrl?: string;
   command?: string;
+  commandArgs?: string[];
   env?: NodeJS.ProcessEnv;
   androidLocal?: boolean;
+  persistentDevices?: boolean;
 }) {
   if (!options.workspaces.length) throw new Error("请选择项目目录。");
   const projects = new Projects();
@@ -30,7 +32,7 @@ export async function startHost(options: {
     ).load(),
   );
   const env = { ...process.env, ...options.env };
-  const args = ["app-server", "--listen", "stdio://"];
+  const args = [...(options.commandArgs ?? []), "app-server", "--listen", "stdio://"];
   if (env.CODEX_GO_BASE_URL) {
     const url = new URL(env.CODEX_GO_BASE_URL);
     if (
@@ -64,7 +66,10 @@ export async function startHost(options: {
     await rpc.start();
     const pairing = new Pairing(
       await new JsonStore(path.join(options.state, "devices.json"), []).load(),
+      Date.now,
+      options.persistentDevices,
     );
+    await pairing.preserveDevices();
     const service = new CodexService(
       rpc,
       projects,
@@ -164,8 +169,7 @@ export async function startHost(options: {
         return connection();
       },
       async close() {
-        await server.close();
-        await rpc.close();
+        await Promise.all([server.close(), rpc.close()]);
       },
     };
   } catch (error) {

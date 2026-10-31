@@ -31,3 +31,12 @@ their individual upstream copyright/license files.
 Cloudflared 2026.10.7 (Apache-2.0) accompanies the Windows app. Its official release
 SHA-256 is fixed in `tools/build-native.mjs` and verified at build and launch.
 Electron includes its own license and Chromium notices in the Windows distribution.
+
+The Windows QR renderer bundles qrcode 1.5.4 (MIT), by Ryan Day and contributors:
+https://github.com/soldair/node-qrcode . Its license accompanies the Windows app
+in resources/licenses/qrcode-LICENSE.txt.
+
+Android camera scanning uses ZXing Android Embedded 4.3.0 and ZXing Core,
+licensed under Apache-2.0: https://github.com/journeyapps/zxing-android-embedded
+and https://github.com/zxing/zxing . These libraries provide QR decoding; camera
+frames stay on the phone.

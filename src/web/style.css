@@ -1,7 +1,8 @@
 :root {
   font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
-  color: #272b27;
-  background: #f8f9f5;
+  color: #dce7df;
+  background: #0c1012;
+  color-scheme: dark;
   font-synthesis: none;
   font-weight: 400;
   font-size: 14px;
@@ -1435,3 +1436,72 @@ input {
     transition: none !important;
   }
 }
+
+/* Shared native workspace: quiet surfaces, generous spacing, one accent. */
+:root { --surface:#14201c; --line:#a8c6b51c; --muted:#8fa69a; --accent:#bdddc8; }
+.app-shell { background:radial-gradient(ellipse at 60% 0,#29463a24,transparent 65%),#0c1012; }
+.sidebar { background:#111a17; border-right:1px solid var(--line); }
+.brand { font-weight:500; letter-spacing:-.8px; }
+.brand-mark,.primary,.send-button { background:var(--accent); color:#162a20; }
+.primary { border-radius:13px; padding:14px 21px; }
+.host-card,.project-select,.host-icon { background:#1b2b23; border-color:var(--line); border-radius:14px; }
+.new-thread { border-radius:12px; }
+.topbar,.conversation-head,.workspace-footer,.welcome-cards,.welcome-cards>div+div,.side-bottom { border-color:var(--line); }
+.breadcrumbs,.top-actions,.connection,.top-actions button,.muted,.conversation-head small,
+.welcome-inner>p,.welcome-cards p,.message-label>span,.composer-tools>span,.approval p,.approval small,
+.modal label,.pair-form label,.file-location,.catalog-list small,.file-list small { color:var(--muted); }
+.eyebrow { color:#88a998; font-weight:400; letter-spacing:2.5px; }
+.welcome-inner { max-width:790px; padding:60px 56px; animation:workspace-arrive 1.1s ease both; }
+.welcome-symbol { background:#20362b; border-color:#688b7633; border-radius:23px; color:var(--accent); transform:none; }
+.welcome-symbol svg { transform:none; }
+.welcome h1 { font-weight:350; font-size:42px; line-height:1.5; letter-spacing:0; }
+.welcome h1 span { color:#a9cbb4; }
+.welcome-cards { margin-top:45px; }
+.welcome-cards h3 { color:#c7d8cd; }
+.welcome-cards button,.file-toolbar button,.file-link,.catalog-list button>span { color:var(--accent); }
+.workspace-footer { color:#6c8978; }
+.error { background:#352722; color:#edbba6; border-radius:12px; }
+.notice,.resume-bar { background:#1e2e24; color:#acc5b3; }
+.state-tag { background:#23362a; color:#a9c5b0; border-radius:20px; }
+.state-tag.running,.stop-button { background:#362f23; color:#dbbf8c; }
+.avatar { background:#24302a; color:#b1c3b7; border-radius:11px; }
+.assistant .avatar { background:#284333; color:var(--accent); }
+.message-label { color:#b6ccbe; }
+.user p { color:#c8d7cd; }
+.tool-item,.plan,.approval,.chat-controls button { background:#18271f; border-color:var(--line); color:#b4c9bb; border-radius:13px; }
+.tool-item pre,.approval pre { background:#101a15; color:#b5cdbd; }
+.empty-chat { color:#7e9a88; }
+.empty-chat h3 { color:#b9d2c2; font-size:24px; font-weight:400; }
+.empty-chat p { color:var(--muted); }
+.composer { background:#1b2922; border-color:#5d806a55; border-radius:21px; box-shadow:0 10px 35px #0002; }
+.composer textarea { color:#e0e9e3; font-size:15px; line-height:1.7; }
+.composer textarea::placeholder { color:#799484; }
+.composer-caption { color:#6e8878; }
+.send-button { border-radius:12px; min-width:42px; min-height:42px; }
+.modal { background:#14201b; border:1px solid #3a5142; border-radius:23px; color:#dce7df; box-shadow:0 25px 100px #0008; }
+.modal-backdrop { background:#070d0bb8; backdrop-filter:blur(8px); }
+.modal input,.pair-form input,.modal select { background:#0f1914; border-color:#3d5545; color:#dce7df; border-radius:11px; }
+.device-list>div,.file-list>* { border-color:var(--line); color:#b8ccbe; }
+.catalog-list button:hover,.file-list>:hover,.delivered-files .file-link { background:#203329; }
+.pair-art { background:#14221b; }
+.pair-form { background:#0c1012; }
+.pair-form h2 { font-weight:400; }
+@keyframes workspace-arrive { from {opacity:0;transform:translateY(16px)} to {opacity:1;transform:none} }
+@media(max-width:700px) {
+  .welcome-inner { padding:36px 27px; }
+  .welcome h1 { font-size:31px; }
+  .welcome-symbol { width:60px; height:60px; margin:24px 0; }
+  .welcome-cards { gap:20px; margin-top:35px; }
+  .welcome-cards>div+div { padding-left:20px; }
+  .topbar { height:60px; padding:0 17px; }
+  .top-actions { gap:14px; }
+  .top-actions button,.mobile-menu { min-width:40px; min-height:44px; align-items:center; justify-content:center; }
+  .conversation-head { padding:20px; }
+  .messages { padding:20px 17px; }
+  .composer-area { padding:10px 13px max(13px,env(safe-area-inset-bottom)); }
+  .composer textarea { font-size:16px; }
+  .composer-caption { display:none; }
+  .modal { max-height:85dvh; padding:25px; }
+  .modal input,.pair-form input,.modal select { font-size:16px; }
+}
+@media(prefers-reduced-motion:reduce) { .welcome-inner { animation:none; } }

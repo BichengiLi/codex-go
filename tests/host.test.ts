@@ -79,6 +79,34 @@ test("pairing is expiring, single-use, revocable and only hashes are persisted",
   );
 });
 
+test("persistent device credentials survive time and host reload until explicitly revoked", async () => {
+  const dir = await temp();
+  const file = path.join(dir, "devices.json");
+  let now = Date.now();
+  const pairing = new Pairing(await new JsonStore(file, []).load(), () => now, true);
+  const { token, device } = await pairing.pair(pairing.issue(), "remembered phone");
+  now += 3650 * 86400_000;
+  const restored = new Pairing(await new JsonStore(file, []).load(), () => now, true);
+  assert.equal(restored.authenticate(token).id, device.id);
+  assert.equal(restored.list()[0].expiresAt, null);
+  await restored.revoke(device.id);
+  assert.throws(() => restored.authenticate(token));
+});
+
+test("desktop upgrade preserves valid pairing without reviving expired credentials", async () => {
+  const dir = await temp(), file = path.join(dir, "devices.json");
+  let now = Date.now();
+  const old = new Pairing(await new JsonStore(file, []).load(), () => now);
+  const expired = await old.pair(old.issue(), "old phone");
+  now += 8 * 86400_000;
+  const valid = await old.pair(old.issue(), "current phone");
+  const upgraded = new Pairing(await new JsonStore(file, []).load(), () => now, true);
+  await upgraded.preserveDevices();
+  now += 365 * 86400_000;
+  assert.equal(upgraded.authenticate(valid.token).id, valid.device.id);
+  assert.throws(() => upgraded.authenticate(expired.token));
+});
+
 test("workspace boundaries reject traversal, prefix collisions, external junctions and reserved names", async () => {
   const base = await temp(),
     root = path.join(base, "root"),
