@@ -20,7 +20,31 @@ export type Thread = {
   status: { type: string };
   turns: Turn[];
 };
-export type Project = { id: string; name: string; path: string };
+export type Project = {
+  id: string;
+  name: string;
+  path: string;
+  source?: "desktop" | "local";
+};
+export type DesktopProject = {
+  id: string;
+  name: string;
+  roots: { path: string }[];
+};
+export type PermissionChoice = {
+  mode: "read-only" | "workspace-write" | "danger-full-access";
+  approval: "untrusted" | "on-request" | "never";
+};
+export type EffectivePermissions = {
+  approvalPolicy: string | Wire;
+  sandbox: Wire;
+  profile?: string | null;
+};
+export type PermissionProfile = {
+  id: string;
+  allowed: boolean;
+  description?: string | null;
+};
 export type Approval = { id: string; method: string; params: Wire };
 export type HostEvent = { seq: number; method: string; params: Wire };
 export type HostInfo = {

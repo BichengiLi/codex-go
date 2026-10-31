@@ -14,6 +14,7 @@
     "start": "tsx src/host/main.ts",
     "test": "node --import tsx --test tests/*.test.ts",
     "probe": "tsx tools/probe.ts",
+    "probe:desktop": "tsx tools/desktop-probe.ts",
     "protocol": "tsx tools/protocol.ts"
   },
   "dependencies": {

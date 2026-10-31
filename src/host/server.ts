@@ -9,6 +9,7 @@ import type { Pairing } from "./auth.js";
 import { HttpError, publicError } from "./errors.js";
 import type { CodexService } from "./service.js";
 import type { HostEvent } from "../shared/types.js";
+import { ProjectFiles } from "./files.js";
 
 const id = z.string().uuid();
 const cookieName = "codex_go_device";
@@ -18,6 +19,7 @@ export async function createServer(options: {
   origins: string[];
   webRoot?: string;
   secure: boolean;
+  privatePaths?: string[];
 }) {
   const app = Fastify({
     logger: false,
@@ -25,6 +27,7 @@ export async function createServer(options: {
     requestTimeout: 30_000,
   });
   const { service, pairing } = options;
+  const files = new ProjectFiles(service.projects, options.privatePaths);
   const hosts = new Set(options.origins.map((o) => new URL(o).host));
   const deviceStreams = new Map<string, Set<() => void>>();
   app.addHook("onRequest", async (request, reply) => {
@@ -81,16 +84,14 @@ export async function createServer(options: {
         error.statusCode === 400);
     const status =
       error instanceof HttpError ? error.statusCode : badInput ? 400 : 503;
-    reply
-      .code(status)
-      .send({
-        error:
-          error instanceof HttpError
-            ? error.message
-            : badInput
-              ? "输入格式不正确。"
-              : publicError(error),
-      });
+    reply.code(status).send({
+      error:
+        error instanceof HttpError
+          ? error.message
+          : badInput
+            ? "输入格式不正确。"
+            : publicError(error),
+    });
   });
   app.post("/api/pair", async (req, reply) => {
     const body = z
@@ -132,6 +133,40 @@ export async function createServer(options: {
       service.projects.create(parentId, name),
     );
   });
+  app.get("/api/projects/desktop", async () => service.desktopProjects());
+  app.post("/api/projects/import", async (req) => {
+    const body = z
+      .object({
+        desktopId: z.string().min(1),
+        rootIndex: z.number().int().min(0),
+      })
+      .parse(req.body);
+    return service.importProject(body.desktopId, body.rootIndex);
+  });
+  const fileQuery = z.object({
+    projectId: z.string().min(1),
+    path: z.string().max(4096).default(""),
+  });
+  app.get("/api/files", async (req) => {
+    const query = fileQuery.parse(req.query);
+    return files.list(query.projectId, query.path);
+  });
+  app.get("/api/files/download", async (req, reply) => {
+    const query = fileQuery.parse(req.query);
+    const file = await files.download(query.projectId, query.path);
+    const filename = encodeURIComponent(file.name).replace(
+      /['()*]/g,
+      (c) => `%${c.charCodeAt(0).toString(16)}`,
+    );
+    return reply
+      .type("application/octet-stream")
+      .header(
+        "Content-Disposition",
+        `attachment; filename="download"; filename*=UTF-8''${filename}`,
+      )
+      .header("Content-Length", file.size)
+      .send(file.stream);
+  });
   app.get("/api/threads", async (req) => {
     const query = z
       .object({ projectId: z.string(), cursor: z.string().optional() })
@@ -155,6 +190,23 @@ export async function createServer(options: {
     const params = z.object({ id }).parse(req.params);
     z.object({ desktopIdleConfirmed: z.literal(true) }).parse(req.body);
     return service.resume(params.id);
+  });
+  app.get("/api/threads/:id/permissions", async (req) => {
+    const params = z.object({ id }).parse(req.params);
+    return service.permissionProfiles(params.id);
+  });
+  app.post("/api/threads/:id/permissions", async (req) => {
+    const params = z.object({ id }).parse(req.params);
+    const body = z
+      .object({
+        mode: z.enum(["read-only", "workspace-write", "danger-full-access"]),
+        approval: z.enum(["untrusted", "on-request", "never"]),
+        fullAccessConfirmed: z.boolean().optional(),
+      })
+      .parse(req.body);
+    if (body.mode === "danger-full-access" && body.fullAccessConfirmed !== true)
+      throw new HttpError(400, "完全访问需要明确确认。");
+    return service.changePermissions(params.id, body);
   });
   app.post("/api/threads/:id/turns", async (req) => {
     const params = z.object({ id }).parse(req.params);

@@ -10,6 +10,10 @@ import type {
   Thread,
   Turn,
   Wire,
+  DesktopProject,
+  PermissionChoice,
+  EffectivePermissions,
+  PermissionProfile,
 } from "../shared/types.js";
 
 type Submission = {
@@ -17,9 +21,43 @@ type Submission = {
   state: "pending" | "done";
   result?: Wire;
 };
+const profileId = (mode: PermissionChoice["mode"]) =>
+  mode === "workspace-write" ? ":workspace" : `:${mode}`;
+const deliveryInstructions =
+  "You are connected through Codex Go. When delivering generated files, save them inside the chat working directory (for example in outputs/) and include a Markdown link with the absolute local file path in your reply so the user can download them. Avoid sandbox:/mnt/data links unless that is the real working directory.";
 export class CodexService extends EventEmitter {
   readonly epoch = randomUUID();
   readonly approvals = new Map<string, Approval & { rpcId: string | number }>();
+  async desktopProjects() {
+    const data: DesktopProject[] = [];
+    let cursor: string | null = null;
+    do {
+      const page: { data: DesktopProject[]; nextCursor: string | null } =
+        await this.rpc.call("project/list", { cursor, limit: 100 });
+      data.push(
+        ...page.data.map((p) => ({ id: p.id, name: p.name, roots: p.roots })),
+      );
+      cursor = page.nextCursor;
+    } while (cursor);
+    return { data };
+  }
+  async importProject(desktopId: string, rootIndex: number) {
+    const project = (await this.desktopProjects()).data.find(
+      (p) => p.id === desktopId,
+    );
+    const root = project?.roots[rootIndex];
+    if (!project || !root)
+      throw new HttpError(
+        404,
+        "Codex App 中未找到此项目目录，请刷新项目列表。",
+      );
+    return this.projects.importDesktop(
+      root.path,
+      project.roots.length > 1
+        ? `${project.name} · ${rootIndex + 1}`
+        : project.name,
+    );
+  }
   private allowed = new Set<string>();
   private attached = new Set<string>();
   private busy = new Set<string>();
@@ -28,10 +66,13 @@ export class CodexService extends EventEmitter {
   private inFlight = new Map<string, Promise<Wire>>();
   private ring: HostEvent[] = [];
   private sequence = 0;
+  private permissions = new Map<string, EffectivePermissions>();
+  private changingPermissions = new Set<string>();
   constructor(
     readonly rpc: AppServer,
     readonly projects: Projects,
     private submissions: JsonStore<Record<string, Submission>>,
+    private permissionStore?: JsonStore<Record<string, PermissionChoice>>,
   ) {
     super();
     rpc.on("message", (msg: Wire) => this.receive(msg));
@@ -82,6 +123,14 @@ export class CodexService extends EventEmitter {
         if (a.rpcId === p.requestId) this.approvals.delete(key);
     }
     if (!threadId || !this.allowed.has(threadId)) return;
+    if (msg.method === "thread/settings/updated") {
+      const settings = p.threadSettings;
+      this.permissions.set(threadId, {
+        approvalPolicy: settings.approvalPolicy,
+        sandbox: settings.sandboxPolicy,
+        profile: settings.activePermissionProfile?.id ?? null,
+      });
+    }
     const turns = this.liveTurns.get(threadId) ?? new Map<string, Turn>();
     this.liveTurns.set(threadId, turns);
     if (msg.method === "turn/started" || msg.method === "turn/completed") {
@@ -170,6 +219,7 @@ export class CodexService extends EventEmitter {
     });
     const data: Thread[] = [];
     for (const thread of result.data) {
+      if (data.some((t) => t.id === thread.id)) continue;
       try {
         await this.projects.authorize(thread.cwd);
         this.allowed.add(thread.id);
@@ -241,6 +291,7 @@ export class CodexService extends EventEmitter {
       attached: this.attached.has(id),
       active: this.busy.has(id),
       approvals: this.pending(id),
+      permissions: this.permissions.get(id) ?? null,
     };
   }
   private isEmptyRollout(error: unknown) {
@@ -258,32 +309,124 @@ export class CodexService extends EventEmitter {
   }
   async create(projectId: string) {
     const cwd = await this.projects.resolve(projectId);
-    const result = await this.rpc.call<{ thread: Thread }>("thread/start", {
-      cwd,
-      approvalPolicy: "untrusted",
-      approvalsReviewer: "user",
-      sandbox: "workspace-write",
-    });
+    const result = await this.rpc.call<Wire & { thread: Thread }>(
+      "thread/start",
+      {
+        cwd,
+        approvalPolicy: "untrusted",
+        approvalsReviewer: "user",
+        sandbox: "workspace-write",
+        developerInstructions: deliveryInstructions,
+      },
+    );
     this.allowed.add(result.thread.id);
     this.metadata.set(result.thread.id, result.thread);
     this.attached.add(result.thread.id);
+    this.capturePermissions(result.thread.id, result);
     return result;
   }
   async resume(id: string) {
+    if (this.attached.has(id)) return this.read(id);
     const state = await this.read(id);
     if (state.active)
       throw new HttpError(409, "此会话正在本服务执行，请先等待或停止。");
-    const result = await this.rpc.call<{ thread: Thread }>("thread/resume", {
-      threadId: id,
-      cwd: state.thread.cwd,
-      approvalPolicy: "untrusted",
-      approvalsReviewer: "user",
-      sandbox: "workspace-write",
-      excludeTurns: true,
-    });
+    const saved = this.permissionStore?.data[id];
+    const result = await this.rpc.call<Wire & { thread: Thread }>(
+      "thread/resume",
+      {
+        threadId: id,
+        cwd: state.thread.cwd,
+        approvalPolicy: saved?.approval ?? "untrusted",
+        approvalsReviewer: "user",
+        ...(saved
+          ? { permissions: profileId(saved.mode) }
+          : { sandbox: "workspace-write" }),
+        excludeTurns: true,
+      },
+    );
     this.attached.add(id);
     this.metadata.set(id, result.thread);
+    this.capturePermissions(id, result);
     return result;
+  }
+  private capturePermissions(id: string, result: Wire) {
+    if (result.sandbox && result.approvalPolicy)
+      this.permissions.set(id, {
+        approvalPolicy: result.approvalPolicy,
+        sandbox: result.sandbox,
+        profile: result.activePermissionProfile?.id ?? null,
+      });
+  }
+  async permissionProfiles(id: string) {
+    const state = await this.read(id);
+    const data: PermissionProfile[] = [];
+    let cursor: string | null = null;
+    do {
+      const page: { data: PermissionProfile[]; nextCursor: string | null } =
+        await this.rpc.call("permissionProfile/list", {
+          cwd: state.thread.cwd,
+          cursor,
+        });
+      data.push(...page.data);
+      cursor = page.nextCursor;
+    } while (cursor);
+    return { data };
+  }
+  async changePermissions(id: string, choice: PermissionChoice) {
+    if (!this.attached.has(id))
+      throw new HttpError(409, "接续此对话后才能调整权限。");
+    if (this.changingPermissions.has(id))
+      throw new HttpError(409, "权限正在更新，请稍候。");
+    this.changingPermissions.add(id);
+    let cancel = () => {};
+    try {
+      const state = await this.read(id);
+      if (
+        state.active ||
+        state.thread.status.type === "active" ||
+        state.thread.turns.some((t) => t.status === "inProgress")
+      )
+        throw new HttpError(409, "请等待任务和审批结束后再调整权限。");
+      const profiles = await this.permissionProfiles(id);
+      if (
+        !profiles.data.some((p) => p.id === profileId(choice.mode) && p.allowed)
+      )
+        throw new HttpError(403, "主机策略不允许此权限模式。");
+      const confirmed = new Promise<EffectivePermissions | null>((resolve) => {
+        const finish = (value: EffectivePermissions | null) => {
+          clearTimeout(timer);
+          this.off("event", listener);
+          resolve(value);
+        };
+        const listener = (event: HostEvent) => {
+          if (
+            event.method === "thread/settings/updated" &&
+            event.params.threadId === id
+          )
+            finish(this.permissions.get(id) ?? null);
+        };
+        const timer = setTimeout(() => finish(null), 5000);
+        cancel = () => finish(null);
+        this.on("event", listener);
+      });
+      await this.rpc.call("thread/settings/update", {
+        threadId: id,
+        approvalPolicy: choice.approval,
+        permissions: profileId(choice.mode),
+        approvalsReviewer: "user",
+      });
+      const effective = await confirmed;
+      if (!effective)
+        throw new HttpError(503, "尚未收到主机的权限确认，请刷新后核对。");
+      if (this.permissionStore) {
+        this.permissionStore.data[id] = choice;
+        await this.permissionStore.save();
+      }
+      return effective;
+    } finally {
+      cancel();
+      this.changingPermissions.delete(id);
+    }
   }
   async submit(
     requestId: string,
@@ -321,6 +464,8 @@ export class CodexService extends EventEmitter {
     }
   }
   async turn(id: string, text: string) {
+    if (this.changingPermissions.has(id))
+      throw new HttpError(409, "权限正在更新，请稍后发送。");
     if (!this.attached.has(id))
       throw new HttpError(409, "请先确认电脑端已停止操作，再接续此会话。");
     if (this.busy.has(id))

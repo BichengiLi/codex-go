@@ -6,6 +6,7 @@ import { Pairing } from "./auth.js";
 import { JsonStore } from "./storage.js";
 import { CodexService } from "./service.js";
 import { createServer } from "./server.js";
+import type { Project, PermissionChoice } from "../shared/types.js";
 
 const { values } = parseArgs({
   options: {
@@ -41,7 +42,10 @@ const origins = [
 ];
 const state = path.resolve(values["state-dir"]!);
 const projects = new Projects();
-await projects.init(roots);
+await projects.init(
+  roots,
+  await new JsonStore<Project[]>(path.join(state, "projects.json"), []).load(),
+);
 const rpcEnv = { ...process.env };
 const args = ["app-server", "--listen", "stdio://"];
 if (process.env.CODEX_GO_BASE_URL) {
@@ -83,6 +87,10 @@ const service = new CodexService(
   rpc,
   projects,
   await new JsonStore(path.join(state, "submissions.json"), {}).load(),
+  await new JsonStore<Record<string, PermissionChoice>>(
+    path.join(state, "permissions.json"),
+    {},
+  ).load(),
 );
 const app = await createServer({
   service,
@@ -90,6 +98,7 @@ const app = await createServer({
   origins,
   secure: !!publicUrl?.startsWith("https://"),
   webRoot: path.resolve("dist/web"),
+  privatePaths: [state],
 });
 try {
   await app.listen({ host: values.host, port });

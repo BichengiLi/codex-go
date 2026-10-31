@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter, once } from "node:events";
-import { mkdtemp, mkdir, readFile, symlink } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -115,6 +115,14 @@ class FakeRpc extends EventEmitter {
   turns: any[] = [];
   unmaterialized = false;
   emptyLog = false;
+  desktopProjects: any[] = [];
+  effective = {
+    approvalPolicy: "untrusted",
+    sandbox: { type: "workspaceWrite", networkAccess: false },
+  };
+  resumes: any[] = [];
+  settingsUpdates = 0;
+  profilesAllowed = true;
   thread() {
     return {
       id: this.threadId,
@@ -127,6 +135,45 @@ class FakeRpc extends EventEmitter {
     };
   }
   async call(method: string, params: any): Promise<any> {
+    if (method === "project/list")
+      return { data: this.desktopProjects, nextCursor: null };
+    if (method === "permissionProfile/list")
+      return {
+        data: [":read-only", ":workspace", ":danger-full-access"].map((id) => ({
+          id,
+          allowed: this.profilesAllowed,
+        })),
+        nextCursor: null,
+      };
+    if (method === "thread/settings/update") {
+      this.settingsUpdates++;
+      this.effective = {
+        approvalPolicy: params.approvalPolicy,
+        sandbox: {
+          type:
+            params.permissions === ":read-only"
+              ? "readOnly"
+              : params.permissions === ":workspace"
+                ? "workspaceWrite"
+                : "dangerFullAccess",
+          networkAccess: false,
+        },
+      };
+      queueMicrotask(() =>
+        this.emit("message", {
+          method: "thread/settings/updated",
+          params: {
+            threadId: this.threadId,
+            threadSettings: {
+              approvalPolicy: this.effective.approvalPolicy,
+              sandboxPolicy: this.effective.sandbox,
+              activePermissionProfile: { id: params.permissions },
+            },
+          },
+        }),
+      );
+      return {};
+    }
     if (method === "config/read")
       return {
         config: {
@@ -139,15 +186,16 @@ class FakeRpc extends EventEmitter {
       return { data: [this.thread()], nextCursor: null };
     if (method === "thread/start") {
       this.cwd = params.cwd;
-      return { thread: this.thread() };
+      return { thread: this.thread(), ...this.effective };
     }
     if (method === "thread/read" && this.emptyLog)
       throw new RpcError(
         -32603,
         "failed to read thread: rollout at test.jsonl is empty",
       );
+    if (method === "thread/resume") this.resumes.push(params);
     if (method === "thread/read" || method === "thread/resume")
-      return { thread: this.thread() };
+      return { thread: this.thread(), ...this.effective };
     if (method === "thread/turns/list" && this.unmaterialized)
       throw new RpcError(
         -32600,
@@ -259,7 +307,10 @@ async function setup() {
     workspace = path.join(dir, "workspaces");
   await mkdir(workspace);
   const projects = new Projects();
-  await projects.init([workspace]);
+  await projects.init(
+    [workspace],
+    await new JsonStore<any>(path.join(dir, "projects.json"), []).load(),
+  );
   const rpc = new FakeRpc();
   rpc.cwd = workspace;
   const submissions = await new JsonStore<any>(
@@ -270,6 +321,7 @@ async function setup() {
     rpc as unknown as AppServer,
     projects,
     submissions,
+    await new JsonStore<any>(path.join(dir, "permissions.json"), {}).load(),
   );
   const pairing = new Pairing(
     await new JsonStore(path.join(dir, "devices.json"), []).load(),
@@ -302,6 +354,189 @@ async function setup() {
     projectId: (await projects.list())[0].id,
   };
 }
+
+test("paired owner imports a saved desktop project outside startup roots and authorization survives restart", async (t) => {
+  const { app, headers, rpc, dir, service } = await setup();
+  t.after(() => app.close());
+  const saved = path.join(dir, "desktop-project");
+  await mkdir(saved);
+  rpc.desktopProjects = [
+    { id: "desktop-id", name: "桌面里的名称", roots: [{ path: saved }] },
+  ];
+  const catalog = await app.inject({ url: "/api/projects/desktop", headers });
+  assert.equal(catalog.statusCode, 200, catalog.body);
+  assert.equal(catalog.json().data[0].name, "桌面里的名称");
+  const imported = await app.inject({
+    method: "POST",
+    url: "/api/projects/import",
+    headers,
+    payload: { desktopId: "desktop-id", rootIndex: 0 },
+  });
+  assert.equal(imported.statusCode, 200, imported.body);
+  assert.equal(imported.json().source, "desktop");
+  assert.equal(imported.json().path, saved);
+  const host = (await app.inject({ url: "/api/host", headers })).json();
+  assert.ok(
+    host.projects.some(
+      (p: any) => p.id === imported.json().id && p.name === "桌面里的名称",
+    ),
+  );
+  const list = await app.inject({
+    url: `/api/threads?projectId=${imported.json().id}`,
+    headers,
+  });
+  assert.equal(list.statusCode, 200);
+  const denied = await app.inject({
+    method: "POST",
+    url: "/api/projects/import",
+    headers,
+    payload: { desktopId: "arbitrary", rootIndex: 0, path: dir },
+  });
+  assert.equal(denied.statusCode, 404);
+  const restored = new Projects();
+  await restored.init(
+    service.projects.roots,
+    await new JsonStore<any>(path.join(dir, "projects.json"), []).load(),
+  );
+  assert.equal(await restored.resolve(imported.json().id), saved);
+});
+
+test("project files download binary Unicode artifacts and reject unauthenticated, private and escaping paths", async (t) => {
+  const { app, headers, service, projectId, dir } = await setup();
+  t.after(() => app.close());
+  const root = await service.projects.resolve(projectId);
+  const content = Buffer.from([0, 255, 12, 10, 1]);
+  await writeFile(path.join(root, "报告.pdf"), content);
+  await writeFile(path.join(root, ".env"), "SECRET=do-not-send");
+  await mkdir(path.join(root, ".runtime"));
+  await writeFile(path.join(root, ".runtime", "devices.json"), "private");
+  await symlink(
+    dir,
+    path.join(root, "escape"),
+    process.platform === "win32" ? "junction" : "dir",
+  );
+  const url = (file: string, download = true) =>
+    `/api/files${download ? "/download" : ""}?projectId=${projectId}&path=${encodeURIComponent(file)}`;
+  const files = await app.inject({ url: url("", false), headers });
+  assert.equal(files.statusCode, 200, files.body);
+  assert.deepEqual(
+    files.json().entries.map((e: any) => e.name),
+    ["报告.pdf"],
+  );
+  const file = await app.inject({ url: url("报告.pdf"), headers });
+  assert.equal(file.statusCode, 200, file.body);
+  assert.deepEqual(file.rawPayload, content);
+  assert.match(
+    file.headers["content-disposition"] as string,
+    /attachment;.*filename\*=UTF-8''/,
+  );
+  const absolute = await app.inject({
+    url: url(path.join(root, "报告.pdf")),
+    headers,
+  });
+  assert.deepEqual(absolute.rawPayload, content);
+  for (const file of [
+    "../submissions.json",
+    ".env",
+    ".runtime/devices.json",
+    "escape/submissions.json",
+    "报告.pdf:stream",
+  ])
+    assert.ok(
+      [400, 403, 404].includes(
+        (await app.inject({ url: url(file), headers })).statusCode,
+      ),
+      file,
+    );
+  assert.equal(
+    (
+      await app.inject({
+        url: url("报告.pdf"),
+        headers: { host: headers.host },
+      })
+    ).statusCode,
+    401,
+  );
+});
+
+test("idle attached chat updates effective permissions, confirms full access and preserves choices on reconnect", async (t) => {
+  const { app, headers, rpc, projectId, service, dir } = await setup();
+  t.after(() => app.close());
+  const url = `/api/threads/${rpc.threadId}/permissions`;
+  const change = (payload: any) =>
+    app.inject({ method: "POST", url, headers, payload });
+  assert.equal(
+    (await change({ mode: "read-only", approval: "on-request" })).statusCode,
+    409,
+  );
+  await app.inject({
+    method: "POST",
+    url: "/api/threads",
+    headers,
+    payload: { projectId, requestId: randomUUID() },
+  });
+  const result = await change({ mode: "read-only", approval: "on-request" });
+  assert.equal(result.statusCode, 200, result.body);
+  assert.equal(result.json().sandbox.type, "readOnly");
+  assert.equal(result.json().approvalPolicy, "on-request");
+  const snapshot = await app.inject({
+    url: `/api/threads/${rpc.threadId}`,
+    headers,
+  });
+  assert.equal(snapshot.json().permissions.sandbox.type, "readOnly");
+  assert.equal(
+    (await change({ mode: "danger-full-access", approval: "never" }))
+      .statusCode,
+    400,
+  );
+  assert.equal(rpc.settingsUpdates, 1);
+  const service2 = new CodexService(
+    rpc as unknown as AppServer,
+    service.projects,
+    await new JsonStore<any>(
+      path.join(dir, "other-submissions.json"),
+      {},
+    ).load(),
+    await new JsonStore<any>(path.join(dir, "permissions.json"), {}).load(),
+  );
+  await service2.resume(rpc.threadId);
+  assert.equal(rpc.resumes.at(-1).permissions, ":read-only");
+  assert.equal(rpc.resumes.at(-1).approvalPolicy, "on-request");
+  rpc.profilesAllowed = false;
+  assert.equal(
+    (
+      await change({
+        mode: "danger-full-access",
+        approval: "never",
+        fullAccessConfirmed: true,
+      })
+    ).statusCode,
+    403,
+  );
+  assert.equal(rpc.settingsUpdates, 1);
+  rpc.profilesAllowed = true;
+  const full = await change({
+    mode: "danger-full-access",
+    approval: "never",
+    fullAccessConfirmed: true,
+  });
+  assert.equal(full.statusCode, 200, full.body);
+  assert.equal(full.json().sandbox.type, "dangerFullAccess");
+  assert.equal(full.json().approvalPolicy, "never");
+  rpc.emit("message", {
+    method: "turn/started",
+    params: {
+      threadId: rpc.threadId,
+      turn: { id: randomUUID(), status: "inProgress", items: [] },
+    },
+  });
+  assert.equal(
+    (await change({ mode: "workspace-write", approval: "untrusted" }))
+      .statusCode,
+    409,
+  );
+  assert.equal(rpc.settingsUpdates, 2);
+});
 test("HTTP boundary: auth, Origin/Host, redacted host info, input and revocation", async (t) => {
   const { app, headers } = await setup();
   t.after(() => app.close());

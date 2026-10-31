@@ -52,13 +52,13 @@ DSH 的会话和设置接口不能直接套用到 Codex；上述划分是结构�
 
 以下能力于 2026-10-31 核对官方文档，并已完成本版本的基础运行验证；详细边界见验证记录。
 
-| 能力 | 文档依据 | 对本项目的意义 |
-| --- | --- | --- |
-| 自定义模型服务商 | 高级配置支持 `model_provider`、`model_providers`、`base_url` 和 `env_key`。 | 可探索直接接入兼容服务，无须先修改 CLI 的认证代码。 |
-| 创建与接续会话 | App Server 提供 `thread/start`、`thread/resume`、`thread/read`、`thread/list`。 | 能以会话 ID 为基础实现历史浏览与继续工作。 |
-| 任务与交互 | App Server 支持 `turn/start`、`turn/steer`、流式事件及审批交互。 | 可为手机提供完整任务界面，而非仅转发聊天文本。 |
-| 客户端协议 | App Server 使用双向 JSON-RPC，支持默认 stdio 及其他传输方式。 | 连接服务可以管理本地子进程并转换为面向手机的接口。 |
-| 协议生成 | CLI 可生成该版本对应的 TypeScript 和 JSON Schema。 | 原型应固定版本，并用生成的协议约束适配层。 |
+| 能力             | 文档依据                                                                        | 对本项目的意义                                      |
+| ---------------- | ------------------------------------------------------------------------------- | --------------------------------------------------- |
+| 自定义模型服务商 | 高级配置支持 `model_provider`、`model_providers`、`base_url` 和 `env_key`。     | 可探索直接接入兼容服务，无须先修改 CLI 的认证代码。 |
+| 创建与接续会话   | App Server 提供 `thread/start`、`thread/resume`、`thread/read`、`thread/list`。 | 能以会话 ID 为基础实现历史浏览与继续工作。          |
+| 任务与交互       | App Server 支持 `turn/start`、`turn/steer`、流式事件及审批交互。                | 可为手机提供完整任务界面，而非仅转发聊天文本。      |
+| 客户端协议       | App Server 使用双向 JSON-RPC，支持默认 stdio 及其他传输方式。                   | 连接服务可以管理本地子进程并转换为面向手机的接口。  |
+| 协议生成         | CLI 可生成该版本对应的 TypeScript 和 JSON Schema。                              | 原型应固定版本，并用生成的协议约束适配层。          |
 
 来源：[Codex App Server](https://developers.openai.com/codex/app-server/)、[Codex 高级配置](https://developers.openai.com/codex/config-advanced/)。
 
@@ -119,13 +119,19 @@ Codex 使用 Rust 运行时，Android 的架构、可执行文件、文件权限
 
 ## 技术选择状态
 
-| 部分 | 初步建议 | 状态 |
-| --- | --- | --- |
-| 手机界面 | 当前 React 网页验证远程模式；Android 原生宿主为后续方向 | 已有响应式原型，实机待测 |
-| 主机运行时 | 官方 Codex CLI / App Server stdio | 已验证固定版本 |
-| 主机连接服务 | TypeScript / Fastify，封装会话、配对、项目与权限 | 已实现首个原型 |
-| 主机平台 | 先验证 Windows 电脑，再扩展常驻 Linux 主机 | 建议顺序 |
-| 远程连接 | 优先评估 SSH / 用户已有私有网络；需要时再设计穿透或中继 | 未决定，Windows 启动流程需单独验证 |
-| 手机本地执行 | 借鉴 dsh-Go 的 Android Linux 用户态运行环境，验证 Codex 与工具链 | 核心可行性验证项 |
+桌面项目目录来自 experimental `project/list`，保留保存的名称与多根目录。经配对的用户点选目录后，连接服务仅登记该已存在项目根的访问授权，写入自身的 `projects.json`；不写桌面注册表。目录授权继续使用 realpath 与路径包含关系校验。当前会话按 cwd 查找，独立 worktree 和其他主机不自动扩权。
+
+文件交付使用独立的 `ProjectFiles` 模块：鉴权后的目录列表与附件流均限定在当前项目，排除私有路径、越界 symlink/junction、目录与大于 200 MB 的文件。下载使用 `Content-Disposition: attachment`，不把生成的 HTML 作为同源页面执行。网页将回复中的本地文件链接和文件修改映射到下载接口；仅用查询参数传路径。
+
+会话权限由 `permissionProfile/list` 提供主机允许的内置模式，`thread/settings/update` 修改，通知 `thread/settings/updated` 确认。连接服务缓存裁剪后的有效设置，持久化用户选择供重启后的接续使用；运行中、未接续或正在改权限的会话不能同时发起设置变更。模型任务在设置变更期间也不能启动。不会修改用户全局配置。
+
+| 部分         | 初步建议                                                         | 状态                               |
+| ------------ | ---------------------------------------------------------------- | ---------------------------------- |
+| 手机界面     | 当前 React 网页验证远程模式；Android 原生宿主为后续方向          | 已有响应式原型，实机待测           |
+| 主机运行时   | 官方 Codex CLI / App Server stdio                                | 已验证固定版本                     |
+| 主机连接服务 | TypeScript / Fastify，封装会话、配对、项目与权限                 | 已实现首个原型                     |
+| 主机平台     | 先验证 Windows 电脑，再扩展常驻 Linux 主机                       | 建议顺序                           |
+| 远程连接     | 优先评估 SSH / 用户已有私有网络；需要时再设计穿透或中继          | 未决定，Windows 启动流程需单独验证 |
+| 手机本地执行 | 借鉴 dsh-Go 的 Android Linux 用户态运行环境，验证 Codex 与工具链 | 核心可行性验证项                   |
 
 项目名中的 `Go` 表达移动使用场景，目前不代表已经选择 Go 语言。

@@ -9,9 +9,13 @@ const version = execFileSync(command, ["--version"], {
   encoding: "utf8",
   windowsHide: true,
 }).trim();
-execFileSync(command, ["app-server", "generate-json-schema", "--out", temp], {
-  windowsHide: true,
-});
+execFileSync(
+  command,
+  ["app-server", "generate-json-schema", "--experimental", "--out", temp],
+  {
+    windowsHide: true,
+  },
+);
 const wanted = [
   "ThreadStartParams",
   "ThreadResumeParams",
@@ -20,6 +24,12 @@ const wanted = [
   "ThreadTurnsListParams",
   "TurnStartParams",
   "TurnInterruptParams",
+  "ProjectListParams",
+  "ProjectListResponse",
+  "ThreadSettingsUpdateParams",
+  "ThreadSettingsUpdatedNotification",
+  "PermissionProfileListParams",
+  "PermissionProfileListResponse",
 ];
 await mkdir("protocol/v2", { recursive: true });
 for (const name of wanted)
@@ -42,10 +52,10 @@ await writeFile(
   JSON.stringify(
     {
       version,
-      generatedBy: "codex app-server generate-json-schema",
+      generatedBy: "codex app-server generate-json-schema --experimental",
       contract: "v2",
       notes:
-        "Only the request schemas used by the first prototype are committed. Full schemas can be regenerated locally.",
+        "Committed subset includes experimental desktop projects and permission settings. Full schemas can be regenerated locally.",
     },
     null,
     2,

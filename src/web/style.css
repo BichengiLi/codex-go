@@ -1279,6 +1279,156 @@ input {
     margin-top: 24px;
   }
 }
+.desktop-projects {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 12px 8px;
+  color: #dce5ce;
+  font-size: 12px;
+  text-align: left;
+}
+.desktop-projects svg:last-child {
+  margin-left: auto;
+}
+.chat-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 40px 12px;
+  border-bottom: 1px solid #e4e7dd;
+}
+.chat-controls button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #edf0e6;
+  color: #526141;
+  border-radius: 7px;
+  padding: 8px 11px;
+  font-size: 11px;
+}
+.catalog-list,
+.file-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 20px;
+  max-height: 48dvh;
+  overflow: auto;
+}
+.catalog-list button {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid #dce2d3;
+  border-radius: 9px;
+  text-align: left;
+}
+.catalog-list button:hover,
+.file-list > :hover {
+  background: #eff3e8;
+}
+.catalog-list small,
+.file-location {
+  overflow-wrap: anywhere;
+  color: #7c8472;
+  font-size: 11px;
+}
+.catalog-list button > span {
+  color: #5b713d;
+  font-size: 11px;
+}
+.file-toolbar {
+  display: flex;
+  justify-content: space-between;
+  margin: 22px 0 12px;
+}
+.file-toolbar button {
+  color: #53693c;
+  padding: 5px;
+}
+.file-location {
+  display: block;
+}
+.file-list > * {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 10px;
+  border-bottom: 1px solid #e3e7dc;
+  text-align: left;
+  text-decoration: none;
+  color: #455638;
+}
+.file-list > * > span {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.file-list small {
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: 10px;
+  color: #7b8570;
+}
+.file-link {
+  color: #4b6d28;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  overflow-wrap: anywhere;
+}
+.delivered-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 18px 48px;
+}
+.delivered-files .file-link {
+  border: 1px solid #d5ddc8;
+  border-radius: 7px;
+  padding: 10px 13px;
+  text-decoration: none;
+  background: #f0f4e9;
+  font-size: 12px;
+}
+.modal select {
+  width: 100%;
+  margin-top: 9px;
+  padding: 12px;
+  border: 1px solid #d7dece;
+  border-radius: 7px;
+  background: #fafbf6;
+  color: #38432e;
+  font: inherit;
+}
+.modal .confirm-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.modal .confirm-check input {
+  width: 17px;
+  height: 17px;
+  margin: 2px 0 0;
+  flex-shrink: 0;
+}
+@media (max-width: 700px) {
+  .chat-controls {
+    padding: 0 22px 12px;
+  }
+  .chat-controls button {
+    font-size: 10px;
+  }
+  .delivered-files {
+    margin-left: 37px;
+  }
+  .catalog-list,
+  .file-list {
+    max-height: 43dvh;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   * {
     scroll-behavior: auto !important;

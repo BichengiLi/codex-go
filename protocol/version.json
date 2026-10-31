@@ -1,6 +1,6 @@
 {
   "version": "codex-cli 0.166.0-alpha.5.1",
-  "generatedBy": "codex app-server generate-json-schema",
+  "generatedBy": "codex app-server generate-json-schema --experimental",
   "contract": "v2",
-  "notes": "Only the request schemas used by the first prototype are committed. Full schemas can be regenerated locally."
+  "notes": "Committed subset includes experimental desktop projects and permission settings. Full schemas can be regenerated locally."
 }

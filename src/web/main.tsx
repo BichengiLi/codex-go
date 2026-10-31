@@ -8,7 +8,16 @@ import type {
   Item,
   Thread,
   Turn,
+  EffectivePermissions,
 } from "../shared/types";
+import {
+  DesktopProjects,
+  FileBrowser,
+  Permissions,
+  AssistantText,
+  FileLink,
+  permissionLabel,
+} from "./panels";
 import "./style.css";
 
 function Icon({ name, size = 20 }: { name: string; size?: number }) {
@@ -67,6 +76,7 @@ type Snapshot = {
   attached: boolean;
   active: boolean;
   approvals: Approval[];
+  permissions: EffectivePermissions | null;
 };
 
 function App() {
@@ -85,9 +95,15 @@ function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [sidebar, setSidebar] = useState(false);
-  const [modal, setModal] = useState<"project" | "devices" | "resume" | null>(
-    null,
-  );
+  const [modal, setModal] = useState<
+    | "project"
+    | "devices"
+    | "resume"
+    | "desktop"
+    | "files"
+    | "permissions"
+    | null
+  >(null);
   const [projectName, setProjectName] = useState("");
   const [devices, setDevices] = useState<
     { id: string; name: string; createdAt: number }[]
@@ -501,6 +517,14 @@ function App() {
           </select>
         </label>
         <button
+          className="desktop-projects"
+          onClick={() => setModal("desktop")}
+        >
+          <Icon name="monitor" size={16} />
+          Codex App 项目
+          <Icon name="chevron" size={14} />
+        </button>
+        <button
           className="new-thread"
           onClick={createThread}
           disabled={busy || !project}
@@ -590,6 +614,15 @@ function App() {
             <span className="breadcrumb-end">{selected ? "对话" : "概览"}</span>
           </div>
           <div className="top-actions">
+            {!selected && (
+              <button
+                aria-label="项目文件"
+                disabled={!project}
+                onClick={() => setModal("files")}
+              >
+                <Icon name="folder" size={17} />
+              </button>
+            )}
             <span className="connection">
               <i className={network === "online" ? "dot" : "dot off"} />
               {network === "online" ? "实时连接" : "重连中"}
@@ -699,6 +732,22 @@ function App() {
                 {active ? "执行中" : snapshot?.attached ? "已接续" : "历史阅读"}
               </span>
             </div>
+            <div className="chat-controls">
+              <button onClick={() => setModal("files")} disabled={!project}>
+                <Icon name="folder" size={15} />
+                项目文件
+              </button>
+              <button
+                onClick={() => setModal("permissions")}
+                disabled={!snapshot?.attached || active || busy}
+                title={
+                  active ? "任务结束后可调整权限" : "调整此对话的权限与审批"
+                }
+              >
+                <Icon name="shield" size={15} />
+                {permissionLabel(snapshot?.permissions)}
+              </button>
+            </div>
             <div className="messages" aria-live="polite">
               {snapshot?.nextCursor && (
                 <button
@@ -722,7 +771,12 @@ function App() {
               {currentThread?.turns.map((turn) => (
                 <div className="turn" key={turn.id}>
                   {turn.items.map((item) => (
-                    <Message key={item.id} item={item} />
+                    <Message
+                      key={item.id}
+                      item={item}
+                      projectId={project}
+                      cwd={currentThread.cwd}
+                    />
                   ))}
                   {turn.error && (
                     <p className="error">
@@ -882,11 +936,17 @@ function App() {
             role="dialog"
             aria-modal="true"
             aria-label={
-              modal === "project"
-                ? "创建项目"
-                : modal === "resume"
-                  ? "接续确认"
-                  : "设备与连接"
+              modal === "desktop"
+                ? "Codex App 项目"
+                : modal === "files"
+                  ? "项目文件"
+                  : modal === "permissions"
+                    ? "权限与审批"
+                    : modal === "project"
+                      ? "创建项目"
+                      : modal === "resume"
+                        ? "接续确认"
+                        : "设备与连接"
             }
           >
             <button
@@ -896,7 +956,28 @@ function App() {
             >
               <Icon name="close" />
             </button>
-            {modal === "project" ? (
+            {modal === "desktop" ? (
+              <DesktopProjects
+                onSelect={async (p) => {
+                  await loadHost();
+                  setProject(p.id);
+                  setSidebar(false);
+                  setModal(null);
+                }}
+              />
+            ) : modal === "files" ? (
+              <FileBrowser projectId={project} />
+            ) : modal === "permissions" ? (
+              <Permissions
+                threadId={selected}
+                effective={snapshot?.permissions ?? null}
+                onSave={async () => {
+                  await loadThread(selected);
+                  setModal(null);
+                  setNotice("此对话的权限与审批已更新。");
+                }}
+              />
+            ) : modal === "project" ? (
               <>
                 <span className="eyebrow">NEW WORKSPACE</span>
                 <h2>给下一个想法一个家</h2>
@@ -1019,7 +1100,15 @@ function App() {
   );
 }
 
-function Message({ item }: { item: Item }) {
+function Message({
+  item,
+  projectId,
+  cwd,
+}: {
+  item: Item;
+  projectId: string;
+  cwd: string;
+}) {
   if (item.type === "userMessage")
     return (
       <article className="message user">
@@ -1047,7 +1136,11 @@ function Message({ item }: { item: Item }) {
           <div className="message-label">
             Codex <span>{item.phase === "commentary" ? "进展" : ""}</span>
           </div>
-          <div className="prose">{item.text}</div>
+          <AssistantText
+            text={item.text ?? ""}
+            projectId={projectId}
+            cwd={cwd}
+          />
         </div>
       </article>
     );
@@ -1070,18 +1163,27 @@ function Message({ item }: { item: Item }) {
     );
   if (item.type === "fileChange")
     return (
-      <details className="tool-item">
-        <summary>
-          <Icon name="folder" size={15} />
-          <span>文件修改 · {item.changes?.length ?? 0} 个文件</span>
-        </summary>
-        {item.changes?.map((c: any, i: number) => (
-          <div key={i}>
-            <strong>{c.path}</strong>
-            <pre>{c.diff}</pre>
-          </div>
-        ))}
-      </details>
+      <>
+        <details className="tool-item">
+          <summary>
+            <Icon name="folder" size={15} />
+            <span>文件修改 · {item.changes?.length ?? 0} 个文件</span>
+          </summary>
+          {item.changes?.map((c: any, i: number) => (
+            <div key={i}>
+              <strong>{c.path}</strong>
+              <pre>{c.diff}</pre>
+            </div>
+          ))}
+        </details>
+        <div className="delivered-files">
+          {item.changes
+            ?.filter((c: any) => c.kind?.type !== "delete")
+            .map((c: any, i: number) => (
+              <FileLink key={i} projectId={projectId} file={c.path} cwd={cwd} />
+            ))}
+        </div>
+      </>
     );
   if (item.type === "plan")
     return (
