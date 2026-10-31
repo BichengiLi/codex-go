@@ -1,7 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter, once } from "node:events";
-import { mkdtemp, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  symlink,
+  writeFile,
+  realpath,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -360,6 +367,7 @@ test("paired owner imports a saved desktop project outside startup roots and aut
   t.after(() => app.close());
   const saved = path.join(dir, "desktop-project");
   await mkdir(saved);
+  const canonicalSaved = await realpath(saved);
   rpc.desktopProjects = [
     { id: "desktop-id", name: "桌面里的名称", roots: [{ path: saved }] },
   ];
@@ -374,7 +382,7 @@ test("paired owner imports a saved desktop project outside startup roots and aut
   });
   assert.equal(imported.statusCode, 200, imported.body);
   assert.equal(imported.json().source, "desktop");
-  assert.equal(imported.json().path, saved);
+  assert.equal(imported.json().path, canonicalSaved);
   const host = (await app.inject({ url: "/api/host", headers })).json();
   assert.ok(
     host.projects.some(
@@ -398,7 +406,7 @@ test("paired owner imports a saved desktop project outside startup roots and aut
     service.projects.roots,
     await new JsonStore<any>(path.join(dir, "projects.json"), []).load(),
   );
-  assert.equal(await restored.resolve(imported.json().id), saved);
+  assert.equal(await restored.resolve(imported.json().id), canonicalSaved);
 });
 
 test("project files download binary Unicode artifacts and reject unauthenticated, private and escaping paths", async (t) => {
