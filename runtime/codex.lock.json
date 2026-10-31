@@ -1,0 +1,12 @@
+{
+  "win32-x64": {
+    "version": "0.166.0-alpha.5.1-win32-x64",
+    "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.166.0-alpha.5.1-win32-x64.tgz",
+    "integrity": "sha512-r+Z7OZ+YrkaLY6L4kn1GLwApOr+LNtH0427+uUQ17K9n69enfwOVur1AaCgCJWFfFOsZHaf+3ZLrmgIzsDik4A=="
+  },
+  "linux-arm64": {
+    "version": "0.166.0-alpha.5.1-linux-arm64",
+    "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.166.0-alpha.5.1-linux-arm64.tgz",
+    "integrity": "sha512-QtT5iCRiQRFgCwIaaile6fTQT0e7fUih/E9E4tYGp+V34A+7mSlQIfOfq98HxLe7CYpP4ipnWBrewyRTt+A7Yw=="
+  }
+}

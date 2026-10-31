@@ -1,0 +1,21 @@
+name: 功能建议
+description: 描述希望改善的使用场景
+title: "[Feature] "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 使用场景与遇到的问题
+      description: 请说明在什么设备、什么模式下希望完成什么任务。
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 希望的行为
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 已尝试的方式或补充信息
