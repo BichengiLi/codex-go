@@ -1,0 +1,241 @@
+import Fastify from "fastify";
+import fastifyStatic from "@fastify/static";
+import { existsSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import type { OutgoingHttpHeaders } from "node:http";
+import { z } from "zod";
+import type { Pairing } from "./auth.js";
+import { HttpError, publicError } from "./errors.js";
+import type { CodexService } from "./service.js";
+import type { HostEvent } from "../shared/types.js";
+
+const id = z.string().uuid();
+const cookieName = "codex_go_device";
+export async function createServer(options: {
+  service: CodexService;
+  pairing: Pairing;
+  origins: string[];
+  webRoot?: string;
+  secure: boolean;
+}) {
+  const app = Fastify({
+    logger: false,
+    bodyLimit: 128 * 1024,
+    requestTimeout: 30_000,
+  });
+  const { service, pairing } = options;
+  const hosts = new Set(options.origins.map((o) => new URL(o).host));
+  const deviceStreams = new Map<string, Set<() => void>>();
+  app.addHook("onRequest", async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    reply.header("X-Content-Type-Options", "nosniff");
+    reply.header("Referrer-Policy", "no-referrer");
+    reply.header(
+      "Content-Security-Policy",
+      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+    );
+    // All public routes use ASCII paths; reject aliases before route-based auth.
+    // Query strings can still carry normal percent-encoded pagination cursors.
+    const rawPath = request.url.split("?")[0];
+    if (
+      rawPath.includes("%") ||
+      rawPath.includes("\\") ||
+      rawPath.includes("//") ||
+      /\/\.{1,2}(\/|$)/.test(rawPath)
+    )
+      throw new HttpError(400, "请求路径格式不正确。");
+    if (!hosts.has(request.headers.host ?? ""))
+      throw new HttpError(403, "主机地址未授权。");
+    const origin = request.headers.origin;
+    if (origin && !options.origins.includes(origin))
+      throw new HttpError(403, "请求来源未授权。");
+    if (
+      request.url.startsWith("/api/") &&
+      !["GET", "HEAD"].includes(request.method) &&
+      !origin
+    )
+      throw new HttpError(403, "写入请求需要有效来源。");
+    if (
+      request.url.startsWith("/api/") &&
+      request.url.split("?")[0] !== "/api/pair"
+    )
+      device(request.headers.cookie);
+  });
+  function token(cookie?: string) {
+    return cookie
+      ?.split(";")
+      .map((x) => x.trim())
+      .find((x) => x.startsWith(cookieName + "="))
+      ?.slice(cookieName.length + 1);
+  }
+  function device(cookie?: string) {
+    return pairing.authenticate(token(cookie));
+  }
+  app.setErrorHandler((error, _request, reply) => {
+    const badInput =
+      error instanceof z.ZodError ||
+      (typeof error === "object" &&
+        error !== null &&
+        "statusCode" in error &&
+        error.statusCode === 400);
+    const status =
+      error instanceof HttpError ? error.statusCode : badInput ? 400 : 503;
+    reply
+      .code(status)
+      .send({
+        error:
+          error instanceof HttpError
+            ? error.message
+            : badInput
+              ? "输入格式不正确。"
+              : publicError(error),
+      });
+  });
+  app.post("/api/pair", async (req, reply) => {
+    const body = z
+      .object({
+        code: z.string().regex(/^\d{8}$/),
+        name: z.string().trim().min(1).max(40),
+      })
+      .parse(req.body);
+    const { token: credential, device: paired } = await pairing.pair(
+      body.code,
+      body.name,
+    );
+    reply.header(
+      "Set-Cookie",
+      `${cookieName}=${credential}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800${options.secure ? "; Secure" : ""}`,
+    );
+    return { id: paired.id };
+  });
+  app.get("/api/host", async (req) => ({
+    name: os.hostname(),
+    version: service.rpc.version,
+    online: service.rpc.online,
+    ...(await service.config()),
+    projects: await service.projects.list(),
+    deviceId: device(req.headers.cookie).id,
+  }));
+  app.get("/api/devices", async () => pairing.list());
+  app.delete("/api/devices/:id", async (req) => {
+    const { id: deviceId } = z.object({ id: z.string() }).parse(req.params);
+    await pairing.revoke(deviceId);
+    for (const close of deviceStreams.get(deviceId) ?? []) close();
+    return { ok: true };
+  });
+  app.post("/api/projects", async (req) => {
+    const { parentId, name, requestId } = z
+      .object({ parentId: z.string(), name: z.string(), requestId: id })
+      .parse(req.body);
+    return service.submit(requestId, "project/create", { parentId, name }, () =>
+      service.projects.create(parentId, name),
+    );
+  });
+  app.get("/api/threads", async (req) => {
+    const query = z
+      .object({ projectId: z.string(), cursor: z.string().optional() })
+      .parse(req.query);
+    return service.list(query.projectId, query.cursor);
+  });
+  app.post("/api/threads", async (req) => {
+    const { projectId, requestId } = z
+      .object({ projectId: z.string(), requestId: id })
+      .parse(req.body);
+    return service.submit(requestId, "thread/create", { projectId }, () =>
+      service.create(projectId),
+    );
+  });
+  app.get("/api/threads/:id", async (req) => {
+    const params = z.object({ id }).parse(req.params);
+    const query = z.object({ cursor: z.string().optional() }).parse(req.query);
+    return service.read(params.id, query.cursor);
+  });
+  app.post("/api/threads/:id/resume", async (req) => {
+    const params = z.object({ id }).parse(req.params);
+    z.object({ desktopIdleConfirmed: z.literal(true) }).parse(req.body);
+    return service.resume(params.id);
+  });
+  app.post("/api/threads/:id/turns", async (req) => {
+    const params = z.object({ id }).parse(req.params);
+    const { text, requestId } = z
+      .object({ text: z.string().trim().min(1).max(50000), requestId: id })
+      .parse(req.body);
+    return service.submit(
+      requestId,
+      "turn/start",
+      { threadId: params.id, text },
+      () => service.turn(params.id, text),
+    );
+  });
+  app.post("/api/threads/:id/interrupt", async (req) => {
+    const params = z.object({ id }).parse(req.params);
+    const { turnId } = z.object({ turnId: id }).parse(req.body);
+    return service.interrupt(params.id, turnId);
+  });
+  app.post("/api/approvals/:id", async (req) => {
+    const params = z.object({ id }).parse(req.params);
+    const { decision } = z
+      .object({ decision: z.enum(["accept", "decline"]) })
+      .parse(req.body);
+    return service.answer(params.id, decision);
+  });
+  app.get("/api/events", async (req, reply) => {
+    const currentDevice = device(req.headers.cookie);
+    const query = z
+      .object({
+        after: z.coerce.number().int().min(0).default(0),
+        epoch: z.string().optional(),
+      })
+      .parse(req.query);
+    reply.hijack();
+    const raw = reply.raw;
+    raw.writeHead(200, {
+      ...reply.getHeaders(),
+      "Content-Type": "text/event-stream",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    } as OutgoingHttpHeaders);
+    const write = (type: string, data: unknown) => {
+      if (!raw.destroyed && raw.writableLength < 2_000_000)
+        raw.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
+      else raw.end();
+    };
+    const replay = service.events(query.after, query.epoch);
+    write("sync", { epoch: replay.epoch, seq: replay.seq, gap: replay.gap });
+    for (const event of replay.events) write("codex", event);
+    const listener = (event: HostEvent) => write("codex", event);
+    service.on("event", listener);
+    const heartbeat = setInterval(() => {
+      try {
+        pairing.authenticate(token(req.headers.cookie));
+        raw.write(": heartbeat\n\n");
+      } catch {
+        raw.end();
+      }
+    }, 15_000);
+    const close = () => raw.end();
+    const streams = deviceStreams.get(currentDevice.id) ?? new Set();
+    streams.add(close);
+    deviceStreams.set(currentDevice.id, streams);
+    raw.on("close", () => {
+      clearInterval(heartbeat);
+      service.off("event", listener);
+      streams.delete(close);
+      if (!streams.size) deviceStreams.delete(currentDevice.id);
+    });
+  });
+  app.addHook("preClose", async () => {
+    for (const streams of deviceStreams.values())
+      for (const close of streams) close();
+  });
+  if (options.webRoot && existsSync(options.webRoot))
+    await app.register(fastifyStatic, { root: options.webRoot });
+  else
+    app.get("/", async (_req, reply) =>
+      reply
+        .type("text/plain")
+        .send("Codex Go 主机已启动。请运行 npm run build 构建手机界面。"),
+    );
+  return app;
+}
