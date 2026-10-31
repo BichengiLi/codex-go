@@ -1,0 +1,36 @@
+# Secrets and machine-specific configuration
+.env
+.env.*
+!.env.example
+auth.json
+.codex/
+*.pem
+*.key
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+out/
+target/
+.next/
+.turbo/
+coverage/
+
+# Local runtime state
+.local/
+.runtime/
+logs/
+*.log
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
