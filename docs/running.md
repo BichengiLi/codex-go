@@ -2,7 +2,7 @@
 
 日常安装使用 Windows/Android App，见[完整 App 流程](native-apps.md)。下文保留 CLI/网页开发入口。
 
-当前交付：Windows 主机服务与手机网页入口。需要 Node.js 22.12+（本次使用 24.11.1），以及具有 v2 历史分页接口的 Codex CLI。本次验证版本为 `0.166.0-alpha.5.1`；请求 Schema 及版本记录保存在 `protocol/`。
+本文介绍 Windows 主机服务与网页开发入口。需要 Node.js 22.12+（本次使用 24.11.1），以及具有 v2 历史分页接口的 Codex CLI。本次验证版本为 `0.166.0-alpha.5.1`；请求 Schema 及版本记录保存在 `protocol/`。
 
 ## 电脑上启动
 
@@ -110,7 +110,7 @@ npm run probe:desktop -- --run --output .local/desktop-integration.json
 
 ## Android 本地探针
 
-仓库不包含 Android APK、PRoot 安装器或预制 rootfs。先在 Android 内准备用户自己选择的 Linux 用户态环境、Node.js 和对应架构的 Codex，进入本仓库执行：
+安装版的 PRoot 安装器、前台服务和运行环境打包源码已经包含在仓库中；APK 和预制 rootfs 属于忽略的构建产物，构建方式见[双端 App 指南](native-apps.md)。下面是使用自备 Linux 用户态的独立协议探针，不代替安装版验证。先在 Android 内准备 Linux 用户态环境、Node.js 和对应架构的 Codex，进入本仓库执行：
 
 ```sh
 npm ci
@@ -119,4 +119,4 @@ sh tools/android-probe.sh
 npm run probe -- --run --output .local/android-probe.json
 ```
 
-需另行验收：文件权限、工具执行、审批、前后台切换、系统挂起、停止与重启。当前没有已连接的 Android 设备，不能据此宣称 Android 本地执行已支持。
+需另行验收：文件权限、工具执行、审批、前后台切换、系统挂起、停止与重启。当前 Android 本地模式已实现并打包，但没有设备执行证据；不能据此宣称已通过实机验收。

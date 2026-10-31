@@ -60,6 +60,7 @@ Windows 使用 Electron 管理主机、连接码与临时外网隧道。Android 
 
 ## 项目文档
 
+- [Agent 二次开发入口](AGENT.md)：快速建立上下文、定位代码、选择验证及构建安装包；`AGENTS.md` 提供自动发现入口。
 - [产品需求](docs/product.md)：用户场景、功能范围与验收标准。
 - [技术方案](docs/architecture.md)：连接方式、运行环境与待验证的能力。
 - [推进路线](docs/roadmap.md)：先验证哪些问题，再实现哪些功能。
