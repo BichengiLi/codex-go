@@ -278,18 +278,25 @@ export function Permissions({
       : "untrusted",
   );
   const [profiles, setProfiles] = useState<PermissionProfile[]>();
+  const [note, setNote] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
-    api<{ data: PermissionProfile[] }>(`/threads/${threadId}/permissions`)
-      .then((r) => setProfiles(r.data))
+    api<{ data: PermissionProfile[]; note?: string }>(
+      `/threads/${threadId}/permissions`,
+    )
+      .then((r) => {
+        setProfiles(r.data);
+        setNote(r.note ?? "");
+      })
       .catch((e) => setError(errorText(e)));
   }, [threadId]);
   return (
     <>
       <span className="eyebrow">CHAT PERMISSIONS</span>
       <h2>权限与审批</h2>
+      {note && <p className="muted">{note}</p>}
       <p className="muted">
         当前生效：{permissionLabel(effective)}。修改用于此对话接下来的任务。
       </p>

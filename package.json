@@ -1,6 +1,6 @@
 {
   "name": "codex-go",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -15,7 +15,10 @@
     "test": "node --import tsx --test tests/*.test.ts",
     "probe": "tsx tools/probe.ts",
     "probe:desktop": "tsx tools/desktop-probe.ts",
-    "protocol": "tsx tools/protocol.ts"
+    "protocol": "tsx tools/protocol.ts",
+    "build:native": "npm run build && node tools/build-native.mjs",
+    "build:windows": "npm run build && node tools/build-native.mjs --windows && node tools/package-windows.mjs",
+    "build:runtime": "python tools/build-runtime.py"
   },
   "dependencies": {
     "@fastify/static": "^10.1.8",
@@ -29,6 +32,9 @@
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.1.0",
+    "electron": "^45.2.1",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.28.2",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vite": "^7.2.0"

@@ -5,9 +5,9 @@ copy an expiring connection code and optionally enable an HTTPS Internet tunnel.
 
 **Blocked by:** None.
 
-**Status:** ready-for-agent
+**Status:** implemented; built and protocol-verified; final UI acceptance stopped by user Escape.
 
-- [ ] A runnable Windows app starts/stops the host without a terminal.
-- [ ] Codes identify an endpoint and expiring pairing secret, and can be renewed.
-- [ ] LAN and optional Internet addresses participate in existing authorization.
-- [ ] Existing project/chat/file/permissions behavior remains functional.
+- [x] Implement host lifecycle and generate runnable Windows installer/ZIP. Development UI started the host; final packaged UI acceptance remains limited.
+- [x] Codes identify an endpoint and expiring pairing secret, and can be renewed.
+- [x] LAN and optional Internet addresses participate in existing authorization; public pairing and real model events passed.
+- [x] Preserve project/chat/file/permission APIs and pass their regression tests.

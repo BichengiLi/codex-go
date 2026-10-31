@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { api, ApiError, requestId } from "./api";
+import { eventStream } from "./native";
 import type {
   Approval,
   HostEvent,
@@ -225,7 +226,7 @@ function App() {
   }, [snapshot?.thread.turns.length, selected]);
   useEffect(() => {
     if (!paired) return;
-    let stream: EventSource | undefined,
+    let stream: ReturnType<typeof eventStream> | undefined,
       timer: ReturnType<typeof setTimeout> | undefined,
       refreshTimer: ReturnType<typeof setTimeout> | undefined;
     let stopped = false,
@@ -240,7 +241,7 @@ function App() {
       }, 250);
     }
     function connect() {
-      stream = new EventSource(
+      stream = eventStream(
         `/api/events?after=${after}&epoch=${encodeURIComponent(epoch)}`,
       );
       stream.addEventListener("sync", (raw) => {

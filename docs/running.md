@@ -1,5 +1,7 @@
 # 运行首个原型
 
+日常安装使用 Windows/Android App，见[完整 App 流程](native-apps.md)。下文保留 CLI/网页开发入口。
+
 当前交付：Windows 主机服务与手机网页入口。需要 Node.js 22.12+（本次使用 24.11.1），以及具有 v2 历史分页接口的 Codex CLI。本次验证版本为 `0.166.0-alpha.5.1`；请求 Schema 及版本记录保存在 `protocol/`。
 
 ## 电脑上启动

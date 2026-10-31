@@ -2,6 +2,8 @@ name: Check
 on: [push, pull_request]
 jobs:
   verify:
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest]
@@ -15,3 +17,23 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+  android:
+    runs-on: ubuntu-latest
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - run: npm run build:native
+      # Compile/lint the native client; full ARM64 runtime is built separately.
+      - run: sh gradlew :app:assembleDebug :app:lintDebug --console plain
+        working-directory: apps/android

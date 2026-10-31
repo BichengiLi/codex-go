@@ -21,11 +21,11 @@ Codex Go 希望把模型服务、开发运行环境和手机界面连接起来�
 
 ## 当前状态
 
-**首个远程原型已实现：Node.js 主机服务 + 适配手机的 React 网页客户端。**
+**0.2.0 已提供 Windows App 和 Android APK 原型，支持连接码与手机本地模式。** 日常流程见[双端 App 使用指南](docs/native-apps.md)。命令行/网页入口继续用于开发与协议验证。
 
 支持短时配对、设备撤销、导入 Codex App 已有项目、创建空项目、新建/接续会话、历史分页、流式输出、生成文件下载、命令/文件审批、会话权限调整、任务停止和断线状态恢复。任务提交使用持久化请求标识，结果未知时不会自动重跑。模型配置复用主机 Codex，或使用主机环境变量指定 Responses 服务。
 
-已在真实自定义服务上完成文件修改、多轮上下文、App Server 重启后同一会话恢复；也已读取桌面 App 原有会话。Android 本地执行、桌面运行任务接管和真实手机跨网络使用仍待验证。详见[验证记录](docs/validation-2026-10-31.md)。
+已在真实自定义服务上完成文件修改、多轮上下文、App Server 重启后同一会话恢复；也已读取桌面 App 原有会话。Windows 内置主机已真实调用模型，Cloudflare 临时公网 HTTPS 地址已完成配对、鉴权读取及真实模型事件轮询。Android APK 已构建并通过 lint，设备上的本地执行和远程使用仍待真机验证。详见[验证记录](docs/validation-2026-10-31.md)及[App 验证范围](docs/native-apps.md#验证范围)。
 
 ## 快速启动
 
@@ -54,7 +54,7 @@ npm run probe -- --run --output .local/probe.json
 
 参考启发本项目的 [dsh-Go](https://github.com/ccch1mneyyy/dsh-Go)，采用“手机本地 + 远程主机”的产品方向，让同一套项目与会话界面适配不同运行环境。
 
-当前使用网页作为远程验证入口，不能单独运行手机本地 CLI。Android 原生宿主与本地 Linux 用户态仍是后续方向；Flutter + Kotlin 为候选。仓库提供 Android/Linux 探针，但没有 APK 或运行时安装器。
+Windows 使用 Electron 管理主机、连接码与临时外网隧道。Android 原生 Activity/前台服务管理连接、加密凭据、文件保存及校验安装的 ARM64 Linux 用户态，App 内共用项目与会话界面。本地运行包含 Node、Git 和固定版本 Codex；PRoot 提供兼容环境，系统隔离由 Android App 提供。手机本地运行尚需设备验收。
 
 电脑与常驻主机模式通过连接服务调用 Codex App Server；手机本地模式也优先探索同一协议。先验证公开接口能否满足需求，再决定是否需要维护 Codex CLI 的修改版本。
 
@@ -65,6 +65,7 @@ npm run probe -- --run --output .local/probe.json
 - [推进路线](docs/roadmap.md)：先验证哪些问题，再实现哪些功能。
 - [dsh-Go 实现分析](docs/references/dsh-go.md)：源码依据、可借鉴设计与 Codex 的差异。
 - [运行说明](docs/running.md)：启动、配对、远程连接、自定义 API 和验证命令。
+- [双端 App](docs/native-apps.md)：安装、连接电脑、手机本地、构建及实际验证范围。
 - [本次验证](docs/validation-2026-10-31.md)：真实协议、模型和浏览器结果，以及未验证范围。
 - [术语表](GLOSSARY.md)：运行主机、项目、会话与接续的定义。
 

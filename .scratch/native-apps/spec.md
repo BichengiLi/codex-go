@@ -1,6 +1,7 @@
 # Installed Windows and Android apps
 
 Status: authorized. User selected Android first, with LAN and Internet connections.
+Implementation/build complete; on-device acceptance pending. See docs/native-apps.md.
 
 ## Problem
 
@@ -24,6 +25,8 @@ chat, approvals, permissions and file-delivery behavior inside installed apps.
 - Offer Cloudflare's temporary tunnel for Internet connectivity, clearly identifying
   that transport in the app. A user-provided HTTPS address remains possible. Do not
   publish an unauthenticated App Server endpoint.
+- Quick Tunnels do not support SSE. Use authenticated JSON event polling on HTTPS
+  Android/tunnel connections with the same sequence, epoch and gap recovery contract.
 - Android owns its connection credentials and downloads. Local API credentials use
   Android Keystore encryption. Local projects belong to the Android app's storage.
 - Bundle a pinned, verified Linux userspace, Node and Codex for ARM64. Run it through

@@ -31,13 +31,25 @@
 - 390px 手机宽度下完成权限修改并显示“只读 · 严格审批”，项目文件弹窗可列出和下载文件。桌面项目目录也在浏览器中核对。
 - 三组新增 HTTP 测试覆盖已保存项目导入与重启、Unicode/二进制下载及路径限制、权限变更和禁止条件。原始真实探针为 `.local/desktop-integration.json`，可用 `npm run probe:desktop -- --run` 复现。
 
+## 0.2.0 双端安装包补充验证
+
+- Windows：Electron 45.2.1，内置固定版本官方 Codex CLI 与 cloudflared 2026.10.7，生成 x64 NSIS 安装程序及 ZIP。开发版曾实际启动主机并显示 LAN 连接码，界面自动操作按用户 Esc 停止；最终包未继续界面验收。
+- Android：JDK 17、Gradle 8.2、AGP 8.2.0、SDK 34，ARM64、minSdk 26、targetSdk 28。调试签名 APK 构建及 lint 通过，包含校验锁定的 Ubuntu/Node/Git/Codex 与 PRoot 原生库；目标 SDK 的侧载原因见[使用指南](native-apps.md)。
+- 自动化测试增至 18 项，新增连接码 URL/过期边界、动态隧道来源、Android 权限可用性、事件轮询中的回复/审批、进程更换和关闭后的停止行为。
+- 本轮生产依赖审计为 0 个已知漏洞；完整依赖审计报告 12 个 moderate 项，均经 Electron 打包工具链的 minimatch 依赖传播，不进入应用主机运行包。未采用审计建议中会降级 electron-builder 的破坏性自动修复。
+- `npx tsx tools/probe-native.ts` 运行实际打包的 `host.cjs` 与内置官方 Windows CLI，在隔离测试项目和新会话中获得 `native-bundle-ok`。模型为用户授权复用的 `gpt-6.1-sol/custom`，没有改动原有用户会话或全局配置。也验证 Android 本地默认整个 App 环境内访问、严格审批及禁用不支持的 Linux 沙箱选项；这是 Windows 上的配置验证，不是 Android 执行验证。
+- `npx tsx tools/probe-tunnel.ts` 经真实 Cloudflare 临时公网地址完成 HTTPS 配对、鉴权读取、创建新会话和真实模型请求，事件轮询接收到 `native-tunnel-ok` 与完成事件。结果时间为 `2026-10-31T06:20:12.601Z`。测试隧道已关闭；未以物理手机的独立网络完成此测试。
+- Cloudflare Quick Tunnels 明确[不支持 SSE](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/)。客户端在 HTTPS Android 连接与临时隧道网页上使用每秒 JSON 事件轮询，共用 SSE 的序号/进程标识和历史补载语义。LAN 和手机本地仍使用 SSE。
+- 本机原始记录位于 `.local/native-probe/result.json`、`.local/tunnel-probe/result.json`。最终安装包、SHA-256 清单和使用指南位于 `.local/releases/0.2.0/`，不提交大体积构建产物。
+- 最终包校验通过 `python tools/verify-packages.py` 检查 APK 实际资源名、完整压缩环境、原生库哈希、必要 ARM64 ELF、Windows ZIP 及 CRC。此检查发现并修复 Android 自动展开 `.gz` 资源的问题，改用保留原字节的 `.tgz`；APK 通过 v2 签名验证。
+
 ## 尚未验证及限制
 
 - 没有向原有桌面对话追加测试消息。桌面 App → 手机网页 → 桌面 App 的完整交替写入验收尚未完成。
 - 当前连接服务启动独立 App Server；不能可靠观察或控制其他桌面进程中的运行任务。接续前由用户确认桌面空闲。
-- 手机网页响应式检查不能代替真实手机上的网络、后台和触摸验收。公网 HTTPS 代理与跨网络连接未部署。
-- `adb devices -l` 没有返回已连接设备；Android 本地运行、沙箱与后台能力均未实测，只有可执行探针。
+- 手机网页响应式检查不能代替真实手机上的网络、后台和触摸验收。公网 HTTPS 协议已验证，手机跨网络使用待验收。
+- `adb devices -l` 没有返回已连接设备，也没有可用模拟器镜像。Android APK 中的配对、系统文件保存、PRoot 启动、工具执行、前台服务存活及重启恢复均未实测。
 - 原型的任意工具权限由当前会话选择的 Codex 沙箱、批准策略及实际平台实现决定，项目授权列表不是工具沙箱。
-- 仓库克隆、原生客户端安装器、跨主机切换、补充指令、完整差异审阅、模型服务错误分类和密钥管理界面尚未实现。
+- Windows/Android 安装包、原生主机切换与 Android 加密模型配置已实现。仓库克隆、跨主机文件/会话迁移、补充指令、完整差异审阅、模型服务错误分类和 iOS 尚未实现。
 
 官方协议依据：[App Server](https://developers.openai.com/codex/app-server/)、[高级配置](https://developers.openai.com/codex/config-advanced/)。实际实现以本机生成的协议为准。

@@ -28,7 +28,6 @@ export async function createServer(options: {
   });
   const { service, pairing } = options;
   const files = new ProjectFiles(service.projects, options.privatePaths);
-  const hosts = new Set(options.origins.map((o) => new URL(o).host));
   const deviceStreams = new Map<string, Set<() => void>>();
   app.addHook("onRequest", async (request, reply) => {
     reply.header("Cache-Control", "no-store");
@@ -48,7 +47,11 @@ export async function createServer(options: {
       /\/\.{1,2}(\/|$)/.test(rawPath)
     )
       throw new HttpError(400, "请求路径格式不正确。");
-    if (!hosts.has(request.headers.host ?? ""))
+    if (
+      !options.origins.some(
+        (origin) => new URL(origin).host === request.headers.host,
+      )
+    )
       throw new HttpError(403, "主机地址未授权。");
     const origin = request.headers.origin;
     if (origin && !options.origins.includes(origin))
@@ -232,14 +235,19 @@ export async function createServer(options: {
       .parse(req.body);
     return service.answer(params.id, decision);
   });
+  const eventQuery = z.object({
+    after: z.coerce.number().int().min(0).default(0),
+    epoch: z.string().optional(),
+  });
+  // Quick Tunnels buffer SSE. Short authenticated JSON requests preserve the
+  // same sequence/epoch replay contract without depending on proxy streaming.
+  app.get("/api/event-poll", async (req) => {
+    const query = eventQuery.parse(req.query);
+    return service.events(query.after, query.epoch);
+  });
   app.get("/api/events", async (req, reply) => {
     const currentDevice = device(req.headers.cookie);
-    const query = z
-      .object({
-        after: z.coerce.number().int().min(0).default(0),
-        epoch: z.string().optional(),
-      })
-      .parse(req.query);
+    const query = eventQuery.parse(req.query);
     reply.hijack();
     const raw = reply.raw;
     raw.writeHead(200, {

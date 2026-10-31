@@ -309,7 +309,7 @@ test("resume token-usage notifications do not invent an empty active turn or rep
   assert.equal(state.thread.turns[0].status, "completed");
   assert.equal(state.thread.turns[0].items[0].text, "completed output");
 });
-async function setup() {
+async function setup(androidLocal = false) {
   const dir = await temp(),
     workspace = path.join(dir, "workspaces");
   await mkdir(workspace);
@@ -329,14 +329,19 @@ async function setup() {
     projects,
     submissions,
     await new JsonStore<any>(path.join(dir, "permissions.json"), {}).load(),
+    androidLocal
+      ? { mode: "danger-full-access", approval: "untrusted" }
+      : undefined,
+    androidLocal,
   );
   const pairing = new Pairing(
     await new JsonStore(path.join(dir, "devices.json"), []).load(),
   );
+  const origins = ["http://localhost:7331"];
   const app = await createServer({
     service,
     pairing,
-    origins: ["http://localhost:7331"],
+    origins,
     secure: false,
   });
   const pair = await app.inject({
@@ -357,10 +362,68 @@ async function setup() {
     rpc,
     service,
     pairing,
+    origins,
     headers,
     projectId: (await projects.list())[0].id,
   };
 }
+
+test("a tunnel origin added after startup participates in Host and Origin authorization", async (t) => {
+  const { app, origins, headers } = await setup();
+  t.after(() => app.close());
+  const remote = {
+    ...headers,
+    host: "phone.example.com",
+    origin: "https://phone.example.com",
+  };
+  assert.equal(
+    (await app.inject({ url: "/api/host", headers: remote })).statusCode,
+    403,
+  );
+  origins.push("https://phone.example.com");
+  assert.equal(
+    (await app.inject({ url: "/api/host", headers: remote })).statusCode,
+    200,
+  );
+  assert.equal(
+    (
+      await app.inject({
+        url: "/api/host",
+        headers: { ...remote, origin: "https://attacker.example.com" },
+      })
+    ).statusCode,
+    403,
+  );
+});
+
+test("Android userspace does not advertise or accept unavailable Linux sandbox profiles", async (t) => {
+  const { app, service, projectId, rpc, headers } = await setup(true);
+  t.after(() => app.close());
+  await service.create(projectId);
+  const response = await app.inject({
+    url: `/api/threads/${rpc.threadId}/permissions`,
+    headers,
+  });
+  assert.equal(response.statusCode, 200);
+  const profiles = response.json();
+  assert.ok(profiles.note.includes("Android"));
+  assert.ok(
+    profiles.data.find((p: any) => p.id === ":danger-full-access").allowed,
+  );
+  assert.ok(
+    profiles.data
+      .filter((p: any) => p.id !== ":danger-full-access")
+      .every((p: any) => !p.allowed),
+  );
+  const rejected = await app.inject({
+    url: `/api/threads/${rpc.threadId}/permissions`,
+    method: "POST",
+    headers,
+    payload: { mode: "workspace-write", approval: "untrusted" },
+  });
+  assert.equal(rejected.statusCode, 403);
+  assert.equal(rpc.settingsUpdates, 0);
+});
 
 test("paired owner imports a saved desktop project outside startup roots and authorization survives restart", async (t) => {
   const { app, headers, rpc, dir, service } = await setup();
@@ -726,6 +789,61 @@ test("approvals route back to the original RPC id, stale approvals reject, and e
   assert.equal(service.events(0, service.epoch).gap, true);
   rpc.emit("offline");
   assert.equal(service.approvals.size, 0);
+});
+
+test("event polling replays output and approvals, reports gaps and rejects revoked devices", async (t) => {
+  const { app, headers, projectId, rpc, service } = await setup();
+  t.after(() => app.close());
+  assert.equal(
+    (
+      await app.inject({
+        url: "/api/event-poll",
+        headers: { host: headers.host },
+      })
+    ).statusCode,
+    401,
+  );
+  const poll = (after: number, epoch: string) =>
+    app.inject({
+      url: `/api/event-poll?after=${after}&epoch=${epoch}`,
+      headers,
+    });
+  assert.equal((await poll(0, "old-process")).json().gap, true);
+  await service.list(projectId);
+  rpc.emit("message", {
+    method: "item/agentMessage/delta",
+    params: {
+      threadId: rpc.threadId,
+      turnId: randomUUID(),
+      itemId: "a",
+      delta: "polled",
+    },
+  });
+  rpc.emit("message", {
+    id: 78,
+    method: "item/commandExecution/requestApproval",
+    params: {
+      threadId: rpc.threadId,
+      turnId: randomUUID(),
+      command: "echo test",
+    },
+  });
+  const replay = (await poll(0, service.epoch)).json();
+  assert.equal(replay.gap, false);
+  assert.deepEqual(
+    replay.events.map((e: any) => e.method),
+    ["item/agentMessage/delta", "bridge/approval"],
+  );
+  assert.equal(replay.events[0].params.delta, "polled");
+  assert.equal((await poll(replay.seq, replay.epoch)).json().events.length, 0);
+  assert.equal((await service.read(rpc.threadId)).approvals.length, 1);
+  const devices = (await app.inject({ url: "/api/devices", headers })).json();
+  await app.inject({
+    method: "DELETE",
+    url: `/api/devices/${devices[0].id}`,
+    headers,
+  });
+  assert.equal((await poll(replay.seq, replay.epoch)).statusCode, 401);
 });
 
 test("SSE authenticates, streams live notifications, closes immediately on device revocation and allows clean shutdown", async (t) => {

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'"
+    />
+    <title>Codex Go</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <span class="logo">C↗</span><span>CODEX GO <small>电脑端</small></span
+        ><span id="status" class="status">尚未启动</span>
+      </header>
+      <section class="intro">
+        <div class="eyebrow">YOUR WORK. WITH YOU.</div>
+        <h1>从电脑出发，<br />在手机继续。</h1>
+        <p>选择项目目录，启动服务，把连接码粘贴到 Android App。</p>
+      </section>
+      <section class="card">
+        <div class="row">
+          <h2>01 / 项目目录</h2>
+          <button data-action="workspace" class="quiet">选择目录</button>
+        </div>
+        <p id="workspace" class="path"></p>
+        <p class="hint">
+          连接后，也可以从「Codex App 项目」选择电脑上已有的项目。
+        </p>
+      </section>
+      <section class="card">
+        <div class="row">
+          <h2>02 / 连接手机</h2>
+          <span id="expiry" class="hint"></span>
+        </div>
+        <textarea
+          id="code"
+          readonly
+          placeholder="启动后在这里显示连接码"
+        ></textarea>
+        <div class="buttons">
+          <button data-action="start" id="start" class="primary">
+            启动服务</button
+          ><button data-action="copy" id="copy">复制连接码</button
+          ><button data-action="refresh" id="refresh" class="quiet">刷新</button
+          ><button data-action="stop" id="stop" class="quiet">停止</button>
+        </div>
+        <p class="hint">
+          连接码有效期 5 分钟，仅可配对一次。配对成功后可直接重连。
+        </p>
+      </section>
+      <section class="card">
+        <div class="row">
+          <div>
+            <h2>03 / 跨网络连接</h2>
+            <p class="hint">
+              外网连接经 Cloudflare 临时隧道转发。请保持电脑 App 运行。
+            </p>
+          </div>
+          <button data-action="internet" id="internet">开启外网</button>
+        </div>
+        <p id="address" class="path"></p>
+      </section>
+      <footer>
+        <button data-action="chat" id="chat" class="quiet">
+          在电脑上打开项目 ↗</button
+        ><span>复用本机 Codex 的模型与登录配置</span>
+      </footer>
+      <p id="error" role="alert"></p>
+    </main>
+    <script src="renderer.js"></script>
+  </body>
+</html>

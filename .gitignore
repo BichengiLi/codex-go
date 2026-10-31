@@ -9,6 +9,8 @@ auth.json
 
 # Dependencies and build output
 node_modules/
+__pycache__/
+*.pyc
 dist/
 build/
 out/
@@ -34,3 +36,15 @@ logs/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Android generated runtime, credentials and machine paths
+apps/android/.gradle/
+apps/android/local.properties
+apps/android/app/src/main/assets/runtime.tar.gz
+apps/android/app/src/main/assets/runtime.tgz
+apps/android/app/src/main/assets/runtime.json
+apps/android/app/src/main/assets/web/
+apps/android/app/src/main/assets/licenses/
+apps/android/app/src/main/jniLibs/
+*.jks
+*.keystore

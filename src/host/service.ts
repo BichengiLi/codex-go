@@ -73,6 +73,11 @@ export class CodexService extends EventEmitter {
     readonly projects: Projects,
     private submissions: JsonStore<Record<string, Submission>>,
     private permissionStore?: JsonStore<Record<string, PermissionChoice>>,
+    private defaultPermissions: PermissionChoice = {
+      mode: "workspace-write",
+      approval: "untrusted",
+    },
+    private androidLocal = false,
   ) {
     super();
     rpc.on("message", (msg: Wire) => this.receive(msg));
@@ -313,9 +318,9 @@ export class CodexService extends EventEmitter {
       "thread/start",
       {
         cwd,
-        approvalPolicy: "untrusted",
+        approvalPolicy: this.defaultPermissions.approval,
         approvalsReviewer: "user",
-        sandbox: "workspace-write",
+        sandbox: this.defaultPermissions.mode,
         developerInstructions: deliveryInstructions,
       },
     );
@@ -336,11 +341,11 @@ export class CodexService extends EventEmitter {
       {
         threadId: id,
         cwd: state.thread.cwd,
-        approvalPolicy: saved?.approval ?? "untrusted",
+        approvalPolicy: saved?.approval ?? this.defaultPermissions.approval,
         approvalsReviewer: "user",
         ...(saved
           ? { permissions: profileId(saved.mode) }
-          : { sandbox: "workspace-write" }),
+          : { sandbox: this.defaultPermissions.mode }),
         excludeTurns: true,
       },
     );
@@ -370,7 +375,17 @@ export class CodexService extends EventEmitter {
       data.push(...page.data);
       cursor = page.nextCursor;
     } while (cursor);
-    return { data };
+    return {
+      data: this.androidLocal
+        ? data.map((p) => ({
+            ...p,
+            allowed: p.allowed && p.id === ":danger-full-access",
+          }))
+        : data,
+      note: this.androidLocal
+        ? "手机本地模式使用 Android App 隔离，可访问此 App 的全部项目；PRoot 不提供只读或项目沙箱。批准策略仍可调整。"
+        : undefined,
+    };
   }
   async changePermissions(id: string, choice: PermissionChoice) {
     if (!this.attached.has(id))

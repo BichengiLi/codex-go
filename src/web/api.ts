@@ -1,3 +1,4 @@
+import { nativeRequest } from "./native";
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -13,12 +14,20 @@ export async function api<T = any>(
 ): Promise<T> {
   let response: Response;
   try {
+    if (window.CodexNative) {
+      const result = await nativeRequest("/api" + url, method, body);
+      const data = JSON.parse(result.body);
+      if (result.status < 200 || result.status >= 300)
+        throw new ApiError(result.status, data.error ?? "连接失败。");
+      return data;
+    }
     response = await fetch("/api" + url, {
       method,
       headers: body === undefined ? {} : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
     throw new ApiError(
       0,
       "与主机的连接中断。请求可能已到达，请刷新并核对任务历史。",
