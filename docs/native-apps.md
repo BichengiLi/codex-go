@@ -42,6 +42,8 @@ cd apps/android
 
 SDK 位置通过 `ANDROID_HOME` 或本机 `apps/android/local.properties` 设置。APK 位于 `apps/android/app/build/outputs/apk/debug/app-debug.apk`，Windows 输出在 `.local/releases/`。调试签名用于个人安装，正式分发签名不在仓库中。Android 为允许应用私有目录内运行开发工具，使用 targetSdk 28；此包通过侧载安装，不是 Google Play 发布包。
 
+CI 显式安装 platform-tools、Android 34 platform 与 Build Tools 34.0.0，不依赖已从 SDK 仓库移除的旧 `tools` 包；只编译/lint 原生客户端，完整 ARM64 环境在本地单独打包。
+
 运行环境输入固定在构建脚本及 `runtime/` 锁文件中，下载后校验哈希，APK 携带运行环境与原生库清单。安装先写入临时目录，验证和解压完成后切换，失败保留原环境；持久项目目录与运行环境分开。大体积二进制不提交 Git。
 
 APK 中的压缩环境使用 `runtime.tgz`，避免 Android 资源合并器自动展开 `.gz` 后更名。构建配置保留压缩归档原字节，避免重复压缩造成构建堆内存不足。最终交付前，把 Windows 安装程序/ZIP 和 APK 放入 `.local/releases/0.2.0/`，APK 命名为 `Codex-Go-0.2.0-Android-arm64.apk`，执行 `python tools/verify-packages.py`。它校验实际包内文件、运行环境/原生库哈希、必要执行文件及归档 CRC，并输出 `release-manifest.json` 和 `SHA256SUMS.txt`。APK 签名另用 Android SDK 的 `apksigner verify --verbose` 检查。
