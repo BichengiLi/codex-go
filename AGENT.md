@@ -83,6 +83,8 @@ CLI 默认端口 **7331**，Windows App 默认 **7332**，Android 本地主机�
 
 ## 原生构建顺序与陷阱
 
+**版本更新约定**：用户要求今后每次更新交付都递增版本名称/版本号。同步更新 Windows 应用版本、Android `versionName` 与递增的 `versionCode`，以及构建脚本、安装包文件名、校验脚本和对应使用说明中的版本；交付前核对双端包内版本与文件名一致。本次已交付的 0.2.0 保持不变，下次更新起执行。
+
 完整命令和产物路径以 [App 指南](docs/native-apps.md) 为准，关键顺序如下：
 
 1. `npm run build:native` 先检查 TS、构建 React，再生成 Electron 和 Android 主机 bundle，复制内置界面。
