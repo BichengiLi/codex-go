@@ -2,6 +2,22 @@
 
 0.2.0 提供 Windows 安装程序、免安装 ZIP 和 ARM64 Android APK。日常使用直接打开 App。Android 需要 Android 8.0 或更新系统；本地环境约需 1.5 GB 可用空间。
 
+## 安装与升级
+
+从 [v0.2.0 发布页](https://github.com/BichengiLi/codex-go/releases/tag/v0.2.0) 下载：
+
+- [Windows x64 安装程序](https://github.com/BichengiLi/codex-go/releases/download/v0.2.0/Codex-Go-0.2.0-Windows-x64.exe)：按提示安装，再打开 Codex Go。
+- [Windows x64 ZIP](https://github.com/BichengiLi/codex-go/releases/download/v0.2.0/Codex-Go-0.2.0-Windows-x64.zip)：完整解压后运行 `Codex Go.exe`。
+- [Android ARM64 APK](https://github.com/BichengiLi/codex-go/releases/download/v0.2.0/Codex-Go-0.2.0-Android-arm64.apk)：在 Android 8.0+ ARM64 手机上允许安装此来源的应用，完成侧载。
+
+安装版已包含所需运行时，使用电脑模式前仍需为电脑当前用户配置可用的 Codex 模型服务。当前 Windows 包未配置代码签名，Android 包使用调试签名；校验文件与运行环境信息随发布页提供。
+
+已有版本通常可以直接覆盖安装；Android 需保持应用 ID 和签名一致。不必预先卸载，卸载或清除数据会删除手机项目、会话与凭据。遇到签名不一致等错误时先记录原文并备份需要的项目，避免把卸载作为默认升级步骤。
+
+Windows 更新前在旧版“连接与项目设置”中主动断开连接，再关闭控制界面，确保旧后台及其内置工具退出；新版启动后按需重新扫码。ZIP 版解压到新目录，停止旧版后再运行新版，避免混用两个版本的后台进程。
+
+本次 v0.2.0 下载已同步体验更新，仍使用 0.2.0 版本标识；后续应用更新会递增版本名称/版本号。
+
 ## 连接电脑的完整流程
 
 1. 打开 Windows 版 Codex Go。中央标题和标语依次渐入，服务和外网 HTTPS 隧道自动启动；看到“连接移动设备，请下滑”后向下滚动，显示二维码。默认授权目录仍为“文档/CodexGo”，使用电脑当前 Codex 配置。

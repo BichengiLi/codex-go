@@ -111,4 +111,8 @@ Android 当前为 ARM64、minSdk 26、targetSdk 28 的侧载包。较低 targetS
 
 ## 完成与交接
 
+公开项目入口为 [GitHub main](https://github.com/BichengiLi/codex-go)，安装包发布在 [Releases](https://github.com/BichengiLi/codex-go/releases)。README 面向使用者维护下载、安装、操作和兼容范围；贡献说明见 [CONTRIBUTING.md](CONTRIBUTING.md)，安全问题走 [SECURITY.md](SECURITY.md)。原创代码采用根目录 MIT LICENSE，第三方许可保留在 `runtime/NOTICE.md` 及随包声明中。
+
+发布时核对标签源码、实际安装包、校验文件和使用指南对应同一次交付。2026-10-31 的 0.2.0 体验更新按用户明确允许的例外同步同名发布；后续更新必须递增版本，避免再次替换已发布版本。main 启用 PR/CI 保护并禁止强推/删除，维护者保留管理权限。
+
 记录改了什么、适用检查及结果、设备/服务验证的实际范围。执行 `git diff --check` 并核对待提交文件，确认没有凭据、生成物和无关改动。提交代码与对应文档；用户要求推送时核对远端 SHA。最终说明明确区分自动测试、构建/静态校验、真实模型和设备实测，未执行的检查写清原因。

@@ -1,5 +1,9 @@
 # Runtime inputs and sources
 
+Original Codex Go code and documentation are licensed under the MIT License
+in the repository root. Third-party software described below retains its own
+copyright and license; the project's MIT license does not relicense it.
+
 The build uses unmodified official Codex CLI npm artifacts (Apache-2.0), Node.js
 Linux distributions (their included LICENSE), Ubuntu Base and a checksum-locked
 Ubuntu package closure (individual package copyright files remain in the image),

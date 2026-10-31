@@ -1,4 +1,4 @@
-# 运行首个原型
+# 从源码运行与开发
 
 日常安装使用 Windows/Android App，见[完整 App 流程](native-apps.md)。下文保留 CLI/网页开发入口。
 

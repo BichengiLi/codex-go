@@ -49,6 +49,6 @@ dsh-Go 的产品结构非常接近 Codex Go 的目标：在同一手机界面中
 
 ## 源码与素材使用边界
 
-参考项目源码采用 AGPL-3.0，README 另说明 `sdk/` 和 `examples/` 使用 MIT；品牌与吉祥物有独立使用条款。当前仅整理架构与实现机制，没有复制源码或素材。以后若决定直接引入组件，应记录具体文件及其许可；本仓库的私有可见性不替代组件授权判断。
+参考项目源码采用 AGPL-3.0，README 另说明 `sdk/` 和 `examples/` 使用 MIT；品牌与吉祥物有独立使用条款。当前仅整理架构与实现机制，没有复制源码或素材。以后若决定直接引入组件，应记录具体文件及其许可；仓库可见性和本项目的 MIT 许可均不替代第三方组件授权判断。
 
 依据：[LICENSE](https://github.com/ccch1mneyyy/dsh-Go/blob/bf01594471e11d7c1dbfe743a304a02d66068b29/LICENSE)、[ASSETS.md](https://github.com/ccch1mneyyy/dsh-Go/blob/bf01594471e11d7c1dbfe743a304a02d66068b29/ASSETS.md)、[README](https://github.com/ccch1mneyyy/dsh-Go/blob/bf01594471e11d7c1dbfe743a304a02d66068b29/README.md)。
