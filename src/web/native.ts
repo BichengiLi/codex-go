@@ -5,6 +5,7 @@ type Bridge = {
   subscribe(id: string, path: string): void;
   unsubscribe(id: string): void;
   download(path: string): void;
+  upload(id: string, threadId: string, remaining: number): void;
   home(): void;
   openLink(address: string): void;
 };
@@ -43,6 +44,22 @@ export function nativeRequest(path: string, method: string, body?: unknown) {
       method,
       body === undefined ? "" : JSON.stringify(body),
     );
+  });
+}
+export function nativeUpload(threadId: string, remaining: number) {
+  return new Promise<{ status: number; body: string }>((resolve, reject) => {
+    const id = String(++next);
+    // Includes time spent in the system document picker and transferring files.
+    const timer = setTimeout(() => {
+      pending.delete(id);
+      reject(new Error("附件上传超时，请检查项目文件后重试。"));
+    }, 15 * 60_000);
+    pending.set(id, (status, body) => {
+      clearTimeout(timer);
+      pending.delete(id);
+      resolve({ status, body });
+    });
+    window.CodexNative!.upload(id, threadId, remaining);
   });
 }
 class NativeStream extends EventTarget {

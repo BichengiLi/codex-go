@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { api, ApiError, requestId } from "./api";
+import { api, ApiError, requestId, uploadAttachments } from "./api";
+import { maxAttachments, type Attachment } from "../shared/types";
 import { eventStream } from "./native";
 import type {
   Approval,
@@ -91,6 +92,10 @@ function App() {
   const [selected, setSelected] = useState("");
   const [snapshot, setSnapshot] = useState<Snapshot>();
   const [draft, setDraft] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const uploadLock = useRef(false);
   const [busy, setBusy] = useState(false);
   const [network, setNetwork] = useState("connecting");
   const [error, setError] = useState("");
@@ -121,6 +126,7 @@ function App() {
   const pendingSubmission = useRef<{
     threadId: string;
     text: string;
+    attachments: string[];
     id: string;
   } | null>(null);
 
@@ -219,6 +225,7 @@ function App() {
   useEffect(() => {
     setSnapshot(undefined);
     setDraft("");
+    setAttachments([]);
     if (selected) loadThread(selected).catch(report);
   }, [selected, loadThread, report]);
   useEffect(() => {
@@ -331,6 +338,7 @@ function App() {
     !!snapshot?.attached &&
     !active &&
     !busy &&
+    !uploading &&
     network === "online" &&
     !!host?.online;
   async function createThread() {
@@ -345,24 +353,63 @@ function App() {
     });
   }
   async function send() {
-    if (!draft.trim() || !canSend) return;
+    if (
+      (!draft.trim() && !attachments.length) ||
+      !canSend ||
+      uploadLock.current
+    )
+      return;
     const text = draft;
+    const paths = attachments.map((file) => file.path);
     if (
       !pendingSubmission.current ||
       pendingSubmission.current.threadId !== selected ||
-      pendingSubmission.current.text !== text
+      pendingSubmission.current.text !== text ||
+      JSON.stringify(pendingSubmission.current.attachments) !==
+        JSON.stringify(paths)
     )
-      pendingSubmission.current = { threadId: selected, text, id: requestId() };
+      pendingSubmission.current = {
+        threadId: selected,
+        text,
+        attachments: paths,
+        id: requestId(),
+      };
     const submissionId = pendingSubmission.current.id;
     await work(async () => {
       await api(`/threads/${selected}/turns`, "POST", {
         text,
+        attachments: paths,
         requestId: submissionId,
       });
       pendingSubmission.current = null;
       setDraft("");
+      setAttachments([]);
       await loadThread(selected);
     });
+  }
+  async function addAttachments(files?: FileList) {
+    if (!canSend || uploadLock.current || attachments.length >= maxAttachments)
+      return;
+    const threadId = selected;
+    uploadLock.current = true;
+    setUploading(true);
+    setError("");
+    try {
+      const result = await uploadAttachments(
+        threadId,
+        maxAttachments - attachments.length,
+        files,
+      );
+      if (selectedRef.current === threadId) {
+        setAttachments((old) => [...old, ...result.files]);
+        if (result.error) setError(result.error);
+      }
+    } catch (error) {
+      report(error);
+    } finally {
+      uploadLock.current = false;
+      setUploading(false);
+    }
   }
 
   if (paired !== true)
@@ -470,7 +517,6 @@ function App() {
             <Icon name="code" size={22} />
           </span>
           Codex <span>Go</span>
-
         </a>
         <button
           className="host-card"
@@ -867,6 +913,49 @@ function App() {
                 }}
               >
                 <div className="composer">
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    multiple
+                    hidden
+                    aria-label="选择文件、图片或音频"
+                    onChange={(event) => {
+                      if (event.target.files?.length)
+                        void addAttachments(event.target.files);
+                      event.target.value = "";
+                    }}
+                  />
+                  {!!attachments.length && (
+                    <ul className="attachments" aria-label="待发送附件">
+                      {attachments.map((file) => (
+                        <li key={file.path}>
+                          <span title={file.name}>
+                            {file.kind === "image"
+                              ? "图片"
+                              : file.kind === "audio"
+                                ? "音频"
+                                : "文件"}{" "}
+                            · {file.name}
+                          </span>
+                          <small>
+                            {Math.max(1, Math.ceil(file.size / 1024))} KB
+                          </small>
+                          <button
+                            type="button"
+                            aria-label={`移除 ${file.name}`}
+                            disabled={busy || uploading}
+                            onClick={() =>
+                              setAttachments((old) =>
+                                old.filter((item) => item.path !== file.path),
+                              )
+                            }
+                          >
+                            <Icon name="close" size={14} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   <textarea
                     aria-label="开发指令"
                     placeholder="描述需求，或者继续你的想法…"
@@ -882,10 +971,27 @@ function App() {
                     }}
                   />
                   <div className="composer-tools">
-                    <span>
-                      <Icon name="folder" size={14} />
-                      {currentProject?.name}
-                    </span>
+                    <div className="attachment-tools">
+                      <button
+                        type="button"
+                        className="attach-button"
+                        disabled={
+                          !canSend || attachments.length >= maxAttachments
+                        }
+                        onClick={() =>
+                          window.CodexNative
+                            ? void addAttachments()
+                            : fileInput.current?.click()
+                        }
+                      >
+                        <Icon name="plus" size={16} /> 添加附件
+                      </button>
+                      <span role="status">
+                        {uploading
+                          ? "正在选择或上传…"
+                          : `${attachments.length}/${maxAttachments} · 每个最多 200 MB`}
+                      </span>
+                    </div>
                     {active ? (
                       <button
                         className="stop-button"
@@ -909,7 +1015,9 @@ function App() {
                       <button
                         className="send-button"
                         aria-label="发送指令"
-                        disabled={!canSend || !draft.trim()}
+                        disabled={
+                          !canSend || (!draft.trim() && !attachments.length)
+                        }
                       >
                         <Icon name="arrow" size={19} />
                       </button>

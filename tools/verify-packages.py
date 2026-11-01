@@ -12,7 +12,8 @@ import tarfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parent.parent
-RELEASE = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else ROOT / '.local/releases/0.2.0'
+VERSION = json.loads((ROOT / 'package.json').read_text(encoding='utf-8'))['version']
+RELEASE = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else ROOT / '.local/releases' / VERSION
 ASSETS = ROOT / 'apps/android/app/src/main/assets'
 
 
@@ -42,7 +43,7 @@ def main():
         for name in ['usr/local/bin/node', 'opt/codex/bin/codex']:
             header = archive.extractfile(name).read(20)
             assert header[:4] == b'\x7fELF' and header[18:20] == b'\xb7\x00', 'Expected AArch64 ELF: ' + name
-    with zipfile.ZipFile(RELEASE / 'Codex-Go-0.2.0-Android-arm64.apk') as apk:
+    with zipfile.ZipFile(RELEASE / f'Codex-Go-{VERSION}-Android-arm64.apk') as apk:
         assert apk.testzip() is None, 'APK CRC error'
         assert json.loads(apk.read('assets/runtime.json')) == manifest
         # A .gz suffix would be expanded/renamed by Android's asset merger.
@@ -55,7 +56,7 @@ def main():
         assert 'assets/licenses/NOTICE.md' in apk.namelist()
         for name, expected in manifest['native'].items():
             assert hashlib.sha256(apk.read('lib/arm64-v8a/' + name)).hexdigest() == expected, name
-    with zipfile.ZipFile(RELEASE / 'Codex-Go-0.2.0-Windows-x64.zip') as windows:
+    with zipfile.ZipFile(RELEASE / f'Codex-Go-{VERSION}-Windows-x64.zip') as windows:
         assert windows.testzip() is None, 'Windows ZIP CRC error'
         for name in ['resources/web/index.html', 'resources/agent.mjs', 'resources/cloudflared.exe',
                      'resources/codex/bin/codex.exe', 'resources/THIRD_PARTY_NOTICES.md']:
@@ -63,10 +64,10 @@ def main():
         assert windows.read('resources/web/index.html') == (ROOT / 'dist/web/index.html').read_bytes()
         assert windows.read('resources/agent.mjs') == (ROOT / 'dist/native/resources/agent.mjs').read_bytes()
         assert hashlib.sha256(windows.read('resources/cloudflared.exe')).hexdigest() == '2493dbc168923bb3e59e5e7716f71deced92992eea9acd6e9d74f84ac7751343'
-    names = ['Codex-Go-0.2.0-Windows-x64.exe', 'Codex-Go-0.2.0-Windows-x64.zip', 'Codex-Go-0.2.0-Android-arm64.apk']
+    names = [f'Codex-Go-{VERSION}-Windows-x64.exe', f'Codex-Go-{VERSION}-Windows-x64.zip', f'Codex-Go-{VERSION}-Android-arm64.apk']
     artifacts = [{'name': name, 'bytes': (RELEASE / name).stat().st_size,
                   'sha256': digest(RELEASE / name)} for name in names]
-    report = {'version': '0.2.0', 'checkedAt': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    report = {'version': VERSION, 'checkedAt': datetime.datetime.now(datetime.timezone.utc).isoformat(),
               'artifacts': artifacts, 'runtimeSha256': manifest['sha256'],
               'archiveEntries': len(members), 'packageIntegrityVerified': True,
               'scope': 'Package content and checksums only; device testing is separate.'}

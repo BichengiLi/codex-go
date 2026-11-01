@@ -8,7 +8,11 @@ import {
   symlink,
   writeFile,
   realpath,
+  readdir,
+  unlink,
 } from "node:fs/promises";
+import { Readable } from "node:stream";
+import { ProjectFiles } from "../src/host/files.js";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -83,10 +87,21 @@ test("persistent device credentials survive time and host reload until explicitl
   const dir = await temp();
   const file = path.join(dir, "devices.json");
   let now = Date.now();
-  const pairing = new Pairing(await new JsonStore(file, []).load(), () => now, true);
-  const { token, device } = await pairing.pair(pairing.issue(), "remembered phone");
+  const pairing = new Pairing(
+    await new JsonStore(file, []).load(),
+    () => now,
+    true,
+  );
+  const { token, device } = await pairing.pair(
+    pairing.issue(),
+    "remembered phone",
+  );
   now += 3650 * 86400_000;
-  const restored = new Pairing(await new JsonStore(file, []).load(), () => now, true);
+  const restored = new Pairing(
+    await new JsonStore(file, []).load(),
+    () => now,
+    true,
+  );
   assert.equal(restored.authenticate(token).id, device.id);
   assert.equal(restored.list()[0].expiresAt, null);
   await restored.revoke(device.id);
@@ -94,13 +109,18 @@ test("persistent device credentials survive time and host reload until explicitl
 });
 
 test("desktop upgrade preserves valid pairing without reviving expired credentials", async () => {
-  const dir = await temp(), file = path.join(dir, "devices.json");
+  const dir = await temp(),
+    file = path.join(dir, "devices.json");
   let now = Date.now();
   const old = new Pairing(await new JsonStore(file, []).load(), () => now);
   const expired = await old.pair(old.issue(), "old phone");
   now += 8 * 86400_000;
   const valid = await old.pair(old.issue(), "current phone");
-  const upgraded = new Pairing(await new JsonStore(file, []).load(), () => now, true);
+  const upgraded = new Pairing(
+    await new JsonStore(file, []).load(),
+    () => now,
+    true,
+  );
   await upgraded.preserveDevices();
   now += 365 * 86400_000;
   assert.equal(upgraded.authenticate(valid.token).id, valid.device.id);
@@ -144,6 +164,7 @@ class FakeRpc extends EventEmitter {
   online = true;
   version = "fixture/1";
   starts = 0;
+  inputs: any[] = [];
   responses: any[] = [];
   threadId = randomUUID();
   cwd = "";
@@ -240,6 +261,7 @@ class FakeRpc extends EventEmitter {
       return { data: this.turns, nextCursor: null };
     if (method === "turn/start") {
       this.starts++;
+      this.inputs.push(params.input);
       await new Promise((resolve) => setTimeout(resolve, 15));
       return { turn: { id: randomUUID(), status: "inProgress", items: [] } };
     }
@@ -555,6 +577,161 @@ test("project files download binary Unicode artifacts and reject unauthenticated
       })
     ).statusCode,
     401,
+  );
+});
+
+test("attachments round-trip on desktop and Android hosts and reach the model once with image inputs", async (t) => {
+  for (const local of [false, true]) {
+    const { app, headers, service, rpc, projectId } = await setup(local);
+    t.after(() => app.close());
+    await service.create(projectId);
+    const upload = async (name: string, payload: Buffer) => {
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/files/upload?threadId=${rpc.threadId}&name=${encodeURIComponent(name)}`,
+        headers: { ...headers, "content-type": "application/octet-stream" },
+        payload,
+      });
+      assert.equal(response.statusCode, 200, response.body);
+      assert.equal(response.json().absolute, undefined);
+      return response.json();
+    };
+    const png = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aOZkAAAAASUVORK5CYII=",
+      "base64",
+    );
+    const image = await upload("截图.png", png);
+    const audio = await upload("录音.mp3", Buffer.from([0, 255, 1, 12]));
+    const other = await upload("报告.txt", Buffer.from("文件内容\n", "utf8"));
+    const duplicateName = await upload("报告.txt", Buffer.from("第二个文件"));
+    const largeBytes = Buffer.alloc(1024 * 1024, 173);
+    const large = await upload("binary.bin", largeBytes);
+    assert.notEqual(other.path, duplicateName.path);
+    assert.equal(image.kind, "image");
+    assert.equal(audio.kind, "audio");
+    const root = await service.projects.resolve(projectId);
+    assert.deepEqual(await readFile(path.join(root, image.path)), png);
+    assert.deepEqual(await readFile(path.join(root, large.path)), largeBytes);
+    const download = await app.inject({
+      url: `/api/files/download?projectId=${projectId}&path=${encodeURIComponent(audio.path)}`,
+      headers,
+    });
+    assert.deepEqual(download.rawPayload, Buffer.from([0, 255, 1, 12]));
+    const payload = {
+      text: "",
+      attachments: [image.path, audio.path, other.path],
+      requestId: randomUUID(),
+    };
+    const submit = () =>
+      app.inject({
+        method: "POST",
+        url: `/api/threads/${rpc.threadId}/turns`,
+        headers,
+        payload,
+      });
+    assert.equal((await submit()).statusCode, 200);
+    // The first task may consume/delete its files; retry must return its saved
+    // result without revalidating inputs or executing a second task.
+    await unlink(path.join(root, image.path));
+    assert.equal((await submit()).statusCode, 200);
+    assert.equal(rpc.starts, 1);
+    assert.equal(rpc.inputs[0][1].type, "localImage");
+    assert.equal(rpc.inputs[0][1].path, path.join(root, image.path));
+    assert.ok(
+      rpc.inputs[0][0].text.includes(
+        JSON.stringify(path.join(root, audio.path)),
+      ),
+    );
+  }
+});
+
+test("upload rejects unauthorized, oversized, private, escaping and cross-project attachments", async (t) => {
+  const { app, headers, service, rpc, projectId } = await setup();
+  t.after(() => app.close());
+  await service.create(projectId);
+  const root = await service.projects.resolve(projectId);
+  const upload = (name: string, extra = {}) =>
+    app.inject({
+      method: "POST",
+      url: `/api/files/upload?threadId=${rpc.threadId}&name=${encodeURIComponent(name)}`,
+      headers: {
+        ...headers,
+        "content-type": "application/octet-stream",
+        ...extra,
+      },
+      payload: Buffer.from("data"),
+    });
+  assert.equal((await upload("test.bin", { cookie: "" })).statusCode, 401);
+  assert.equal(
+    (await upload("test.bin", { origin: "https://attacker.example" }))
+      .statusCode,
+    403,
+  );
+  assert.equal(
+    (await upload("test.bin", { "content-length": String(201 * 1024 * 1024) }))
+      .statusCode,
+    413,
+  );
+  for (const name of [
+    "../escape",
+    "C:\\test",
+    ".env",
+    "credentials.json",
+    "CON",
+    "bad.",
+    "a/b",
+    "file.pem",
+  ])
+    assert.equal((await upload(name)).statusCode, 400, name);
+  const good = await upload("ok.bin");
+  assert.equal(good.statusCode, 200, good.body);
+  const child = await service.projects.create(projectId, "other");
+  // Simulate opening a different project's conversation on the same host.
+  const nextId = randomUUID();
+  rpc.threadId = nextId;
+  rpc.cwd = child.path;
+  await service.resume(nextId);
+  const bad = await app.inject({
+    method: "POST",
+    url: `/api/threads/${nextId}/turns`,
+    headers,
+    payload: {
+      text: "read",
+      attachments: [good.json().path],
+      requestId: randomUUID(),
+    },
+  });
+  assert.equal(bad.statusCode, 404);
+  assert.equal(rpc.starts, 0);
+  await symlink(
+    root,
+    path.join(child.path, ".codex-go-uploads"),
+    process.platform === "win32" ? "junction" : "dir",
+  );
+  assert.equal((await upload("escape.bin")).statusCode, 403);
+});
+
+test("failed upload streams remove partial files and honor private project paths", async () => {
+  const dir = await temp();
+  const projects = new Projects();
+  await projects.init([dir]);
+  const root = await realpath(dir);
+  const files = new ProjectFiles(projects);
+  const broken = Readable.from(
+    (async function* () {
+      yield Buffer.from("partial");
+      throw new Error("interrupted");
+    })(),
+  );
+  await assert.rejects(
+    files.upload(root, "partial.bin", broken),
+    /interrupted/,
+  );
+  assert.deepEqual(await readdir(path.join(root, ".codex-go-uploads")), []);
+  const privateFiles = new ProjectFiles(projects, [root]);
+  await assert.rejects(
+    privateFiles.upload(root, "secret.bin", Readable.from(["secret"])),
+    (error: any) => error.statusCode === 403,
   );
 });
 

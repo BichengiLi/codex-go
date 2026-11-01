@@ -77,7 +77,7 @@ await writeFile(
   root + "/package.json",
   JSON.stringify({
     name: "codex-go-desktop",
-    version: "0.2.0",
+    version: JSON.parse(await readFile("package.json", "utf8")).version,
     main: "main.mjs",
     description: "Codex Go computer connection agent",
     author: "BichengiLi",

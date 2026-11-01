@@ -478,7 +478,18 @@ export class CodexService extends EventEmitter {
       this.inFlight.delete(requestId);
     }
   }
-  async turn(id: string, text: string) {
+  async workingDirectory(id: string) {
+    const thread =
+      this.metadata.get(id) ??
+      (
+        await this.rpc.call<{ thread: Thread }>("thread/read", {
+          threadId: id,
+          includeTurns: false,
+        })
+      ).thread;
+    return this.projects.authorize(thread.cwd);
+  }
+  async turn(id: string, text: string, images: string[] = []) {
     if (this.changingPermissions.has(id))
       throw new HttpError(409, "权限正在更新，请稍后发送。");
     if (!this.attached.has(id))
@@ -489,7 +500,10 @@ export class CodexService extends EventEmitter {
     try {
       return await this.rpc.call("turn/start", {
         threadId: id,
-        input: [{ type: "text", text, text_elements: [] }],
+        input: [
+          { type: "text", text, text_elements: [] },
+          ...images.map((image) => ({ type: "localImage", path: image })),
+        ],
       });
     } catch (error) {
       if (error instanceof RpcError) this.busy.delete(id);

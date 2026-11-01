@@ -72,8 +72,28 @@ try {
       .filter((p: any) => p.id !== ":danger-full-access")
       .every((p: any) => !p.allowed),
   );
+  const attachmentResponse = await fetch(
+    url +
+      `/api/files/upload?threadId=${thread.id}&name=${encodeURIComponent("附件口令.txt")}`,
+    {
+      method: "POST",
+      headers: {
+        origin: url,
+        cookie,
+        "content-type": "application/octet-stream",
+      },
+      body: "The required reply token is native-bundle-attachment-ok.",
+    },
+  );
+  assert.equal(
+    attachmentResponse.status,
+    200,
+    await attachmentResponse.clone().text(),
+  );
+  const attachment = await attachmentResponse.json();
   await api(`/threads/${thread.id}/turns`, "POST", {
-    text: "请只回复 native-bundle-ok，不调用工具，不执行命令。",
+    text: "请只读取附件的文本，不修改文件，只回复文件中指定的 reply token。",
+    attachments: [attachment.path],
     requestId: randomUUID(),
   });
   let snapshot: any;
@@ -81,6 +101,8 @@ try {
   do {
     await new Promise((resolve) => setTimeout(resolve, 800));
     snapshot = await api(`/threads/${thread.id}`);
+    for (const approval of snapshot.approvals ?? [])
+      await api(`/approvals/${approval.id}`, "POST", { decision: "accept" });
     if (snapshot.thread.turns.some((t: any) => t.status === "completed")) break;
   } while (Date.now() < deadline);
   const text = snapshot.thread.turns
@@ -88,7 +110,10 @@ try {
     .filter((i: any) => i.type === "agentMessage")
     .map((i: any) => i.text)
     .join("\n");
-  assert.ok(text.includes("native-bundle-ok"), "Model response missing");
+  assert.ok(
+    text.includes("native-bundle-attachment-ok"),
+    "Uploaded attachment was not read",
+  );
   const evidence = {
     bundledHost: true,
     authenticatedHttp: true,
@@ -96,6 +121,7 @@ try {
     provider: host.provider,
     localDefaultPermissions: attached.permissions,
     modelReplied: true,
+    uploadedAttachmentReadByModel: true,
     threadId: thread.id,
   };
   await writeFile(

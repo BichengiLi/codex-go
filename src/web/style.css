@@ -753,6 +753,58 @@ h1 {
   display: flex;
   color: #465e2c;
 }
+.attachment-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.attachment-tools > span {
+  font-size: 10px;
+  color: var(--muted);
+}
+.attach-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 9px 8px;
+  font-size: 12px;
+  color: var(--accent);
+}
+.attachments {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.attachments li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 7px 9px;
+  border-radius: 7px;
+  background: #24372b;
+  color: #e0e9e3;
+  font-size: 11px;
+}
+.attachments li > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attachments small {
+  white-space: nowrap;
+  color: var(--muted);
+}
+.attachments button {
+  padding: 5px;
+  display: flex;
+  flex-shrink: 0;
+}
 .stop-button {
   display: flex;
   align-items: center;

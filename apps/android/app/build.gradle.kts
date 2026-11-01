@@ -7,8 +7,8 @@ android {
         minSdk = 26
         // Private executable userspace needs the legacy exec policy. Sideload build.
         targetSdk = 28
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
         ndk { abiFilters += "arm64-v8a" }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }

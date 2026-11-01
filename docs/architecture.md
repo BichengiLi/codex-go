@@ -4,6 +4,10 @@
 
 ## 当前实现
 
+0.3.0 增加 `POST /api/files/upload?threadId=…&name=…`，以 `application/octet-stream` 接收文件流；手机本地和电脑主机共用同一接口。文件先校验会话工作目录、名称和大小，再保存到项目内独立附件目录；失败清除未完成文件。任务提交接受相对于会话目录的附件引用，重新校验归属与真实路径，将识别的栅格图片转换为 App Server `localImage`，其余文件提供工具可读路径。接口保留请求去重和鉴权规则。
+
+Android 的系统文档选择器通过原生网络层直接上传，不把文件转为 JavaScript Base64。内置聊天页提供电脑会话与手机本地会话入口，共用原有本地引擎与 Keystore API 配置；运行主机分别拥有项目和会话，入口选择不迁移数据或撤销配对。
+
 - `src/host/rpc.ts`：管理官方 App Server 子进程和 stdio JSON-RPC，处理通知、回调、超时与退出。
 - `src/host/service.ts`：提供会话/任务接口、审批路由、事件序号与缓存，持久化操作意图以防重复提交。
 - `src/host/projects.ts`：校验真实授权路径，包括符号链接与 Windows junction；展示根目录和直接子目录。
