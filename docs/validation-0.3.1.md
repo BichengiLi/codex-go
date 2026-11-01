@@ -1,6 +1,6 @@
 # 0.3.1 连接状态与实时任务进展验证
 
-日期：2026-11-01。源码版本 0.3.1，Android versionCode 4。GitHub Releases 的 0.2.0 保持不变，本次安装包位于本机 `.local/releases/0.3.1/`。
+日期：2026-11-01。源码版本 0.3.1，Android versionCode 4。本次安装包发布到 [v0.3.1](https://github.com/BichengiLi/codex-go/releases/tag/v0.3.1)，本机归档位于 `.local/releases/0.3.1/`；已发布的 0.2.0 保持不变。
 
 ## 行为
 
@@ -14,6 +14,7 @@
 
 - `npm test`：27/27 通过，覆盖摘要/计划/工具/回复在完成前可读、快照事件重放、完成后保留计划并结束活动状态，以及缺少分页方法时的历史读取。
 - `npm run build:native`：TypeScript、生产 React、Android 主机和 Windows 后台 bundle 通过。
+- 实现提交 `ee4ee67` 的 GitHub Actions Windows/Ubuntu 测试与构建、Android 构建与 lint 均通过：[CI 记录](https://github.com/BichengiLi/codex-go/actions/runs/41298135600)。发布提交仅同步说明和下载入口，应用源码与本次验证构建一致。
 - 390 × 844 隔离 Electron 窄屏共享界面分别经 SSE 和模拟原生轮询桥验证：延迟连接及原生 401 不显示码表单，摘要分两次可见、计划与工具输出在任务完成前可见、回复第一段早于第二段、完成后活动指示结束。无横向溢出或前端错误。证据：`.local/live-ui/result.json`、`result-polling.json`、`streaming.png`。这属于桌面渲染与桥接模拟。
 
 ## 真实模型
@@ -31,4 +32,4 @@
 
 ## 设备范围
 
-`adb devices` 无设备。Android 系统安装、扫码与恢复连接、手机 PRoot 执行、跨主机会话选择和后台恢复仍待真机验收。未将安装包发布到 GitHub Releases。
+`adb devices` 无设备。Android 系统安装、扫码与恢复连接、手机 PRoot 执行、跨主机会话选择和后台恢复仍待真机验收；本次沿用预发布标记。

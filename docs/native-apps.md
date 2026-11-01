@@ -1,16 +1,16 @@
 # Windows 与 Android App
 
-0.3.1 本地更新修复已配对手机重复显示八位码表单，增加实时任务进展；包含 0.3.0 的消息附件和手机本地会话入口。下面的 v0.2.0 链接仍指向已发布版本；本地新包位于 `.local/releases/0.3.1/`。
+0.3.1 预发布版修复已配对手机重复显示八位码表单，增加实时任务进展；包含 0.3.0 的消息附件和手机本地会话入口。本机交付归档位于 `.local/releases/0.3.1/`，公开下载见下方。
 
-0.2.0 提供 Windows 安装程序、免安装 ZIP 和 ARM64 Android APK。日常使用直接打开 App。Android 需要 Android 8.0 或更新系统；本地环境约需 1.5 GB 可用空间。
+0.3.1 提供 Windows 安装程序、免安装 ZIP 和 ARM64 Android APK。日常使用直接打开 App。Android 需要 Android 8.0 或更新系统；本地环境约需 1.5 GB 可用空间。
 
 ## 安装与升级
 
-从 [v0.2.0 发布页](https://github.com/BichengiLi/codex-go/releases/tag/v0.2.0) 下载：
+从 [v0.3.1 发布页](https://github.com/BichengiLi/codex-go/releases/tag/v0.3.1) 下载：
 
-- [Windows x64 安装程序](https://github.com/BichengiLi/codex-go/releases/download/v0.2.0/Codex-Go-0.2.0-Windows-x64.exe)：按提示安装，再打开 Codex Go。
-- [Windows x64 ZIP](https://github.com/BichengiLi/codex-go/releases/download/v0.2.0/Codex-Go-0.2.0-Windows-x64.zip)：完整解压后运行 `Codex Go.exe`。
-- [Android ARM64 APK](https://github.com/BichengiLi/codex-go/releases/download/v0.2.0/Codex-Go-0.2.0-Android-arm64.apk)：在 Android 8.0+ ARM64 手机上允许安装此来源的应用，完成侧载。
+- [Windows x64 安装程序](https://github.com/BichengiLi/codex-go/releases/download/v0.3.1/Codex-Go-0.3.1-Windows-x64.exe)：按提示安装，再打开 Codex Go。
+- [Windows x64 ZIP](https://github.com/BichengiLi/codex-go/releases/download/v0.3.1/Codex-Go-0.3.1-Windows-x64.zip)：完整解压后运行 `Codex Go.exe`。
+- [Android ARM64 APK](https://github.com/BichengiLi/codex-go/releases/download/v0.3.1/Codex-Go-0.3.1-Android-arm64.apk)：在 Android 8.0+ ARM64 手机上允许安装此来源的应用，完成侧载。
 
 安装版已包含所需运行时，使用电脑模式前仍需为电脑当前用户配置可用的 Codex 模型服务。当前 Windows 包未配置代码签名，Android 包使用调试签名；校验文件与运行环境信息随发布页提供。
 
@@ -18,7 +18,7 @@
 
 Windows 更新前在旧版“连接与项目设置”中主动断开连接，再关闭控制界面，确保旧后台及其内置工具退出；新版启动后按需重新扫码。ZIP 版解压到新目录，停止旧版后再运行新版，避免混用两个版本的后台进程。
 
-本次 v0.2.0 下载已同步体验更新，仍使用 0.2.0 版本标识；后续应用更新会递增版本名称/版本号。
+本次版本为 0.3.1，Android versionCode 4；已发布的 v0.2.0 保持不变。
 
 ## 连接电脑的完整流程
 

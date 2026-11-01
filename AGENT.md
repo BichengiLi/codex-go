@@ -6,6 +6,8 @@
 
 **2026-11-01 / 0.3.1 更新**：原生连接检查使用已保存凭据，不再显示网页八位码表单；`src/shared/live.ts` 共用实时摘要/计划/工具/回复投影，HTTP 快照按事件序号重放。历史分页遇到 CLI -32601 时回退到 `thread/read`。本轮验证与服务/设备边界见 [0.3.1 验证记录](docs/validation-0.3.1.md)。
 
+**0.3.1 发布**：双端安装包与校验文件见 [v0.3.1](https://github.com/BichengiLi/codex-go/releases/tag/v0.3.1)，更新说明见 [发布说明](docs/release-0.3.1.md)。标签位于当前功能分支的发布文档提交，应用源码与已通过 CI 的 `ee4ee67` 一致；main 单独维护。
+
 ## 先建立上下文
 
 1. 查看 `git status --short --branch` 和最近提交，保留现有改动；当前工作从现有分支继续，新建分支默认使用 `codex/` 前缀。

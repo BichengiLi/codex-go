@@ -18,10 +18,10 @@
 - **自带模型服务**：填写服务地址和 API Key，获取可用模型、多选并设置当前模型；服务需兼容 Responses 与工具调用。
 - **项目与会话**：选择授权目录、导入 Codex App 已保存的项目、创建空项目、新建或接续空闲会话。
 - **任务与文件**：查看输出和文件改动、处理执行审批、调整会话权限、停止任务、下载生成文件。
-- **消息附件（0.3.0 本地更新）**：发送文件、图片和音频到当前会话的运行主机；连接电脑后可直接选择电脑会话或手机本地会话，手机继续使用同一份 API 配置。见[本次验证范围](docs/validation-2026-11-01.md)。
-- **连接与实时进展（0.3.1 本地更新）**：手机已配对后直接验证连接，显示服务提供的思考摘要、任务计划、工具输出和逐段回复。见 [0.3.1 验证记录](docs/validation-0.3.1.md)。
+- **消息附件**：发送文件、图片和音频到当前会话的运行主机；连接电脑后可直接选择电脑会话或手机本地会话，手机继续使用同一份 API 配置。见[附件验证范围](docs/validation-2026-11-01.md)。
+- **连接与实时进展**：手机已配对后直接验证连接，显示服务提供的思考摘要、任务计划、工具输出和逐段回复。见 [0.3.1 验证记录](docs/validation-0.3.1.md)。
 
-当前源码和本地安装包为 **0.3.1**，GitHub Releases 仍为 **0.2.0 预发布版**。Windows 界面、后台连接和公网配对已验证；Android 已完成构建、单元测试和静态检查，扫码、本地执行及后台恢复仍待真机验收。详见[验证范围](docs/native-apps.md#验证范围)。
+当前为 [**0.3.1 预发布版**](https://github.com/BichengiLi/codex-go/releases/tag/v0.3.1)。Windows 界面、后台连接和公网配对已验证；Android 已完成构建、单元测试和静态检查，扫码、本地执行及后台恢复仍待真机验收。详见[验证范围](docs/native-apps.md#验证范围)。
 
 ## 下载与安装
 
@@ -29,16 +29,16 @@
 
 | 平台 | 下载 | 安装方法 |
 | --- | --- | --- |
-| Windows x64 安装版 | [Codex-Go-0.2.0-Windows-x64.exe](https://github.com/BichengiLi/codex-go/releases/download/v0.2.0/Codex-Go-0.2.0-Windows-x64.exe) | 运行安装程序，按提示完成安装 |
-| Windows x64 免安装版 | [Codex-Go-0.2.0-Windows-x64.zip](https://github.com/BichengiLi/codex-go/releases/download/v0.2.0/Codex-Go-0.2.0-Windows-x64.zip) | 完整解压，运行 `Codex Go.exe` |
-| Android ARM64 | [Codex-Go-0.2.0-Android-arm64.apk](https://github.com/BichengiLi/codex-go/releases/download/v0.2.0/Codex-Go-0.2.0-Android-arm64.apk) | Android 8.0+，允许浏览器或文件管理器安装此 APK |
+| Windows x64 安装版 | [Codex-Go-0.3.1-Windows-x64.exe](https://github.com/BichengiLi/codex-go/releases/download/v0.3.1/Codex-Go-0.3.1-Windows-x64.exe) | 运行安装程序，按提示完成安装 |
+| Windows x64 免安装版 | [Codex-Go-0.3.1-Windows-x64.zip](https://github.com/BichengiLi/codex-go/releases/download/v0.3.1/Codex-Go-0.3.1-Windows-x64.zip) | 完整解压，运行 `Codex Go.exe` |
+| Android ARM64 | [Codex-Go-0.3.1-Android-arm64.apk](https://github.com/BichengiLi/codex-go/releases/download/v0.3.1/Codex-Go-0.3.1-Android-arm64.apk) | Android 8.0+，允许浏览器或文件管理器安装此 APK |
 
 Android 本地环境建议预留至少 1.5 GB 可用空间。当前 APK 使用调试签名、通过侧载安装；Windows 包尚未配置代码签名。仅从本仓库 Releases 获取安装包。
 
-可使用发布页的 [SHA256SUMS.txt](https://github.com/BichengiLi/codex-go/releases/download/v0.2.0/SHA256SUMS.txt) 核对下载完整性：
+可使用发布页的 [SHA256SUMS.txt](https://github.com/BichengiLi/codex-go/releases/download/v0.3.1/SHA256SUMS.txt) 核对下载完整性：
 
 ```powershell
-Get-FileHash .\Codex-Go-0.2.0-Windows-x64.exe -Algorithm SHA256
+Get-FileHash .\Codex-Go-0.3.1-Windows-x64.exe -Algorithm SHA256
 ```
 
 已有安装通常可以覆盖更新，不必先卸载。**卸载 Android App 或清除数据会删除手机上的项目、会话与 API 配置。** 如果出现签名不一致或安装失败，先保留数据并记录错误，参见[安装与升级](docs/native-apps.md#安装与升级)。
