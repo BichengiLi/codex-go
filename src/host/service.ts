@@ -4,6 +4,7 @@ import { AppServer, RpcError } from "./rpc.js";
 import { Projects } from "./projects.js";
 import { JsonStore } from "./storage.js";
 import { HttpError } from "./errors.js";
+import { updateTurn } from "../shared/live.js";
 import type {
   Approval,
   HostEvent,
@@ -26,6 +27,7 @@ const profileId = (mode: PermissionChoice["mode"]) =>
 const deliveryInstructions =
   "You are connected through Codex Go. When delivering generated files, save them inside the chat working directory (for example in outputs/) and include a Markdown link with the absolute local file path in your reply so the user can download them. Avoid sandbox:/mnt/data links unless that is the real working directory.";
 export class CodexService extends EventEmitter {
+  private paginatedHistory = true;
   readonly epoch = randomUUID();
   readonly approvals = new Map<string, Approval & { rpcId: string | number }>();
   async desktopProjects() {
@@ -138,50 +140,11 @@ export class CodexService extends EventEmitter {
     }
     const turns = this.liveTurns.get(threadId) ?? new Map<string, Turn>();
     this.liveTurns.set(threadId, turns);
-    if (msg.method === "turn/started" || msg.method === "turn/completed") {
-      const previous = turns.get(p.turn.id);
-      turns.set(p.turn.id, {
-        ...p.turn,
-        items: p.turn.items?.length ? p.turn.items : (previous?.items ?? []),
-      });
-      // This cache only bridges notifications and durable history, not all history.
+    const turnId = p.turnId ?? p.turn?.id;
+    if (turnId) {
+      const updated = updateTurn(turns.get(turnId), msg.method, p);
+      if (updated) turns.set(turnId, updated);
       if (turns.size > 30) turns.delete(turns.keys().next().value!);
-    } else if (
-      p.turnId &&
-      [
-        "item/started",
-        "item/completed",
-        "item/agentMessage/delta",
-        "item/commandExecution/outputDelta",
-      ].includes(msg.method)
-    ) {
-      const turn: Turn = turns.get(p.turnId) ?? {
-        id: p.turnId,
-        status: "inProgress",
-        items: [],
-      };
-      turns.set(p.turnId, turn);
-      if (msg.method === "item/started" || msg.method === "item/completed") {
-        const index = turn.items.findIndex((i) => i.id === p.item.id);
-        if (index < 0) turn.items.push(p.item);
-        else turn.items[index] = p.item;
-      } else if (
-        msg.method === "item/agentMessage/delta" ||
-        msg.method === "item/commandExecution/outputDelta"
-      ) {
-        let item = turn.items.find((i) => i.id === p.itemId);
-        const field = msg.method.includes("agentMessage")
-          ? "text"
-          : "aggregatedOutput";
-        if (!item) {
-          item = {
-            id: p.itemId,
-            type: field === "text" ? "agentMessage" : "commandExecution",
-          };
-          turn.items.push(item);
-        }
-        item[field] = (item[field] ?? "") + p.delta;
-      }
     }
     if (msg.method === "turn/started") this.busy.add(threadId);
     if (msg.method === "turn/completed") {
@@ -249,23 +212,7 @@ export class CodexService extends EventEmitter {
     await this.projects.authorize(thread.cwd);
     this.metadata.set(id, thread);
     this.allowed.add(id);
-    const history = await this.rpc
-      .call<{
-        data: Turn[];
-        nextCursor: string | null;
-      }>("thread/turns/list", {
-        threadId: id,
-        cursor,
-        limit: 20,
-        sortDirection: "desc",
-        itemsView: "full",
-      })
-      .catch((error: unknown) => {
-        // Codex 0.166 accepts thread/read for a loaded empty conversation, but
-        // refuses pagination until its first user message materializes the log.
-        if (this.isEmptyRollout(error)) return { data: [], nextCursor: null };
-        throw error;
-      });
+    const history = await this.history(id, cursor);
     const combined = new Map(
       history.data
         .slice()
@@ -281,7 +228,20 @@ export class CodexService extends EventEmitter {
           persisted.status === "inProgress"
         )
           combined.set(turnId, live);
-        else this.liveTurns.get(id)?.delete(turnId);
+        else {
+          // Plans arrive as notifications and may not be in durable item history.
+          combined.set(turnId, {
+            ...persisted,
+            items: [
+              ...persisted.items,
+              ...live.items.filter(
+                (item) =>
+                  item.type === "taskPlan" &&
+                  !persisted.items.some((saved) => saved.id === item.id),
+              ),
+            ],
+          });
+        }
       }
     if (
       !cursor &&
@@ -297,6 +257,47 @@ export class CodexService extends EventEmitter {
       active: this.busy.has(id),
       approvals: this.pending(id),
       permissions: this.permissions.get(id) ?? null,
+      eventSeq: this.sequence,
+      eventEpoch: this.epoch,
+    };
+  }
+  private async history(
+    id: string,
+    cursor?: string,
+  ): Promise<{ data: Turn[]; nextCursor: string | null }> {
+    if (this.paginatedHistory && !cursor?.startsWith("history:")) {
+      try {
+        return await this.rpc.call("thread/turns/list", {
+          threadId: id,
+          cursor,
+          limit: 20,
+          sortDirection: "desc",
+          itemsView: "full",
+        });
+      } catch (error) {
+        if (this.isEmptyRollout(error)) return { data: [], nextCursor: null };
+        if (!(error instanceof RpcError) || error.code !== -32601) throw error;
+        this.paginatedHistory = false;
+      }
+    }
+    // Some pinned CLI backends advertise turns/list but only implement read.
+    const offset = cursor ? /^history:(\d+)$/.exec(cursor)?.[1] : "0";
+    if (offset === undefined)
+      throw new HttpError(400, "历史游标已失效，请重新打开会话。");
+    const start = Number(offset);
+    const { thread } = await this.rpc
+      .call<{ thread: Thread }>("thread/read", {
+        threadId: id,
+        includeTurns: true,
+      })
+      .catch((error: unknown) => {
+        if (this.isEmptyRollout(error)) return { thread: { turns: [] } };
+        throw error;
+      });
+    const newest = (thread.turns ?? []).slice().reverse();
+    return {
+      data: newest.slice(start, start + 20),
+      nextCursor: newest.length > start + 20 ? `history:${start + 20}` : null,
     };
   }
   private isEmptyRollout(error: unknown) {
@@ -500,6 +501,7 @@ export class CodexService extends EventEmitter {
     try {
       return await this.rpc.call("turn/start", {
         threadId: id,
+        summary: "auto",
         input: [
           { type: "text", text, text_elements: [] },
           ...images.map((image) => ({ type: "localImage", path: image })),

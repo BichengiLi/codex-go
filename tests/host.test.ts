@@ -170,6 +170,7 @@ class FakeRpc extends EventEmitter {
   cwd = "";
   turns: any[] = [];
   unmaterialized = false;
+  unsupportedPagination = false;
   emptyLog = false;
   desktopProjects: any[] = [];
   effective = {
@@ -252,6 +253,8 @@ class FakeRpc extends EventEmitter {
     if (method === "thread/resume") this.resumes.push(params);
     if (method === "thread/read" || method === "thread/resume")
       return { thread: this.thread(), ...this.effective };
+    if (method === "thread/turns/list" && this.unsupportedPagination)
+      throw new RpcError(-32601, "list_turns is not supported yet");
     if (method === "thread/turns/list" && this.unmaterialized)
       throw new RpcError(
         -32600,
@@ -293,6 +296,38 @@ test("a newly created unmaterialized conversation is readable and ready for its 
   assert.equal(read.json().attached, true);
   assert.deepEqual(read.json().thread.turns, []);
 });
+test("history read falls back when CLI does not support pagination and retains live output", async (t) => {
+  const { app, headers, projectId, rpc, service } = await setup();
+  t.after(() => app.close());
+  await service.create(projectId);
+  rpc.unsupportedPagination = true;
+  rpc.turns = Array.from({ length: 24 }, (_, i) => ({
+    id: `old-${i}`,
+    status: "completed",
+    items: [],
+  }));
+  const turnId = randomUUID();
+  rpc.emit("message", {
+    method: "item/agentMessage/delta",
+    params: { threadId: rpc.threadId, turnId, itemId: "live", delta: "实时输出" },
+  });
+  const current = await app.inject({
+    url: `/api/threads/${rpc.threadId}`,
+    headers,
+  });
+  assert.equal(current.statusCode, 200, current.body);
+  assert.equal(current.json().thread.turns.at(-1).items[0].text, "实时输出");
+  assert.equal(current.json().nextCursor, "history:20");
+  const older = await app.inject({
+    url: `/api/threads/${rpc.threadId}?cursor=history:20`,
+    headers,
+  });
+  assert.deepEqual(
+    older.json().thread.turns.map((turn: any) => turn.id),
+    ["old-0", "old-1", "old-2", "old-3"],
+  );
+});
+
 test("active first-turn events remain readable while the new rollout file is empty", async (t) => {
   const { app, headers, projectId, rpc } = await setup();
   t.after(() => app.close());
@@ -335,6 +370,81 @@ test("active first-turn events remain readable while the new rollout file is emp
   assert.equal(response.statusCode, 200, response.body);
   assert.equal(response.json().active, true);
   assert.equal(response.json().thread.turns[0].items[0].text, "live output");
+});
+
+test("public reasoning summaries and plans survive HTTP refresh while tools and reply stream", async (t) => {
+  const { app, headers, projectId, rpc, service } = await setup();
+  t.after(() => app.close());
+  await service.create(projectId);
+  const turnId = randomUUID();
+  const emit = (method: string, params = {}) =>
+    rpc.emit("message", {
+      method,
+      params: { threadId: rpc.threadId, turnId, ...params },
+    });
+  emit("turn/started", {
+    turn: { id: turnId, status: "inProgress", items: [] },
+  });
+  emit("item/started", {
+    item: { id: "reason", type: "reasoning", summary: [], content: [] },
+  });
+  emit("item/reasoning/summaryTextDelta", {
+    itemId: "reason",
+    summaryIndex: 0,
+    delta: "检查项目",
+  });
+  emit("item/reasoning/summaryTextDelta", {
+    itemId: "reason",
+    summaryIndex: 0,
+    delta: "结构",
+  });
+  emit("turn/plan/updated", {
+    plan: [{ step: "读取项目", status: "inProgress" }],
+  });
+  emit("item/started", {
+    item: {
+      id: "cmd",
+      type: "commandExecution",
+      command: "pwd",
+      status: "inProgress",
+    },
+  });
+  emit("item/commandExecution/outputDelta", {
+    itemId: "cmd",
+    delta: "/workspace",
+  });
+  emit("item/agentMessage/delta", { itemId: "reply", delta: "正在处理" });
+  const response = await app.inject({
+    url: `/api/threads/${rpc.threadId}`,
+    headers,
+  });
+  assert.equal(response.statusCode, 200);
+  const state = response.json();
+  assert.equal(state.active, true);
+  assert.equal(state.eventEpoch, service.epoch);
+  assert.equal(state.eventSeq, service.events(0, service.epoch).seq);
+  assert.deepEqual(state.thread.turns[0].items[0].summary, ["检查项目结构"]);
+  assert.equal(state.thread.turns[0].items[1].plan[0].step, "读取项目");
+  assert.equal(state.thread.turns[0].items[2].aggregatedOutput, "/workspace");
+  assert.equal(state.thread.turns[0].items[3].text, "正在处理");
+  const poll = await app.inject({
+    url: `/api/event-poll?epoch=${service.epoch}&after=0`,
+    headers,
+  });
+  assert.ok(
+    poll
+      .json()
+      .events.some((e: any) => e.method === "item/reasoning/summaryTextDelta"),
+  );
+  emit("turn/completed", {
+    turn: { id: turnId, status: "completed", items: [] },
+  });
+  const final = await app.inject({
+    url: `/api/threads/${rpc.threadId}`,
+    headers,
+  });
+  assert.equal(final.json().active, false);
+  assert.equal(final.json().thread.turns[0].items[3].text, "正在处理");
 });
 
 test("resume token-usage notifications do not invent an empty active turn or replace completed history", async (t) => {

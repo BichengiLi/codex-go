@@ -121,7 +121,11 @@ class PollingStream extends EventTarget {
       }
       this.query.set("after", String(replay.seq));
       this.query.set("epoch", replay.epoch);
-      if (!this.stopped) this.timer = setTimeout(() => void this.poll(), 1000);
+      if (!this.stopped)
+        this.timer = setTimeout(
+          () => void this.poll(),
+          replay.events.length ? 200 : 700,
+        );
     } catch {
       if (!this.stopped) this.onerror?.(new Event("error"));
     }

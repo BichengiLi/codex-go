@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { api, ApiError, requestId, uploadAttachments } from "./api";
 import { maxAttachments, type Attachment } from "../shared/types";
 import { eventStream } from "./native";
+import { activityLabel, replayTurns, updateTurns } from "../shared/live";
 import type {
   Approval,
   HostEvent,
@@ -79,6 +80,8 @@ type Snapshot = {
   active: boolean;
   approvals: Approval[];
   permissions: EffectivePermissions | null;
+  eventSeq?: number;
+  eventEpoch?: string;
 };
 
 function App() {
@@ -123,6 +126,9 @@ function App() {
   const readGeneration = useRef(0);
   const listGeneration = useRef(0);
   const bottom = useRef<HTMLDivElement>(null);
+  const followOutput = useRef(true);
+  const eventJournal = useRef<HostEvent[]>([]);
+  const eventEpoch = useRef("");
   const pendingSubmission = useRef<{
     threadId: string;
     text: string;
@@ -180,22 +186,42 @@ function App() {
         generation !== readGeneration.current
       )
         return;
-      setSnapshot((old) =>
-        older && old
-          ? {
-              ...result,
-              thread: {
-                ...result.thread,
-                turns: [
-                  ...result.thread.turns,
-                  ...old.thread.turns.filter(
-                    (t) => !result.thread.turns.some((n) => n.id === t.id),
-                  ),
-                ],
-              },
-            }
-          : result,
-      );
+      setSnapshot((old) => {
+        if (older && old)
+          return {
+            ...old,
+            nextCursor: result.nextCursor,
+            thread: {
+              ...old.thread,
+              turns: [
+                ...result.thread.turns,
+                ...old.thread.turns.filter(
+                  (t) => !result.thread.turns.some((n) => n.id === t.id),
+                ),
+              ],
+            },
+          };
+        const recent = eventJournal.current.filter(
+          (event) => event.params.threadId === threadId,
+        );
+        const after =
+          result.eventEpoch === eventEpoch.current
+            ? (result.eventSeq ?? Number.MAX_SAFE_INTEGER)
+            : Number.MAX_SAFE_INTEGER;
+        const turns = replayTurns(result.thread.turns, recent, after);
+        return {
+          ...result,
+          active: recent.some(
+            (event) =>
+              event.seq > after &&
+              (event.method === "turn/started" ||
+                event.method === "turn/completed"),
+          )
+            ? turns.some((turn) => turn.status === "inProgress")
+            : result.active,
+          thread: { ...result.thread, turns },
+        };
+      });
     },
     [],
   );
@@ -226,11 +252,12 @@ function App() {
     setSnapshot(undefined);
     setDraft("");
     setAttachments([]);
+    followOutput.current = true;
     if (selected) loadThread(selected).catch(report);
   }, [selected, loadThread, report]);
   useEffect(() => {
-    bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [snapshot?.thread.turns.length, selected]);
+    if (followOutput.current) bottom.current?.scrollIntoView({ block: "end" });
+  }, [snapshot, selected]);
   useEffect(() => {
     if (!paired) return;
     let stream: ReturnType<typeof eventStream> | undefined,
@@ -253,6 +280,11 @@ function App() {
       );
       stream.addEventListener("sync", (raw) => {
         const sync = JSON.parse((raw as MessageEvent).data);
+        if (sync.epoch !== eventEpoch.current || sync.gap) {
+          eventJournal.current = [];
+          readGeneration.current++;
+        }
+        eventEpoch.current = sync.epoch;
         epoch = sync.epoch;
         if (sync.gap) {
           after = sync.seq;
@@ -266,6 +298,8 @@ function App() {
         const event: HostEvent = JSON.parse((raw as MessageEvent).data);
         if (event.seq <= after) return;
         after = event.seq;
+        eventJournal.current.push(event);
+        if (eventJournal.current.length > 2000) eventJournal.current.shift();
         if (event.method === "bridge/offline") {
           setNetwork("offline");
           setNotice("Codex 进程已退出。请重启主机服务后核对历史。");
@@ -273,39 +307,22 @@ function App() {
         }
         if (event.params.threadId !== selectedRef.current) return;
         if (
-          event.method === "item/agentMessage/delta" ||
-          event.method === "item/commandExecution/outputDelta"
+          event.method === "turn/started" ||
+          event.method === "turn/completed" ||
+          event.method === "turn/plan/updated" ||
+          event.method.startsWith("item/")
         ) {
           setSnapshot((old) => {
             if (!old) return old;
-            const turns = structuredClone(old.thread.turns);
-            let turn = turns.find((t) => t.id === event.params.turnId);
-            if (!turn) {
-              turn = {
-                id: event.params.turnId,
-                status: "inProgress",
-                items: [],
-              };
-              turns.push(turn);
-            }
-            let item = turn.items.find((i) => i.id === event.params.itemId);
-            if (!item) {
-              item = {
-                id: event.params.itemId,
-                type: event.method.includes("agentMessage")
-                  ? "agentMessage"
-                  : "commandExecution",
-                text: "",
-                aggregatedOutput: "",
-              };
-              turn.items.push(item);
-            }
-            const field = event.method.includes("agentMessage")
-              ? "text"
-              : "aggregatedOutput";
-            item[field] = (item[field] ?? "") + event.params.delta;
-            return { ...old, active: true, thread: { ...old.thread, turns } };
+            const turns = updateTurns(old.thread.turns, event);
+            if (turns === old.thread.turns) return old;
+            return {
+              ...old,
+              active: turns.some((turn) => turn.status === "inProgress"),
+              thread: { ...old.thread, turns },
+            };
           });
+          if (event.method === "turn/completed") refresh();
         } else if (event.method === "bridge/unsupported")
           setNotice("此操作需要暂不支持的交互，主机已返回错误。");
         else refresh();
@@ -375,15 +392,33 @@ function App() {
         id: requestId(),
       };
     const submissionId = pendingSubmission.current.id;
+    followOutput.current = true;
     await work(async () => {
-      await api(`/threads/${selected}/turns`, "POST", {
-        text,
-        attachments: paths,
-        requestId: submissionId,
-      });
+      const result = await api<{ turn: Turn }>(
+        `/threads/${selected}/turns`,
+        "POST",
+        {
+          text,
+          attachments: paths,
+          requestId: submissionId,
+        },
+      );
       pendingSubmission.current = null;
       setDraft("");
       setAttachments([]);
+      setSnapshot((old) => {
+        if (!old || old.thread.id !== selected) return old;
+        const turns = old.thread.turns.some(
+          (turn) => turn.id === result.turn.id,
+        )
+          ? old.thread.turns
+          : [...old.thread.turns, result.turn];
+        return {
+          ...old,
+          active: turns.some((turn) => turn.status === "inProgress"),
+          thread: { ...old.thread, turns },
+        };
+      });
       await loadThread(selected);
     });
   }
@@ -412,7 +447,34 @@ function App() {
     }
   }
 
-  if (paired !== true)
+  if (paired === undefined || (window.CodexNative && paired !== true))
+    return (
+      <main className="connection-page" aria-live="polite">
+        <span className="eyebrow">CODEX GO</span>
+        <h2>{paired === undefined ? "正在连接工作空间…" : "需要重新连接"}</h2>
+        <p className="muted">
+          {error ||
+            (paired === undefined
+              ? "正在验证已保存的连接，请稍候。"
+              : "此设备的连接凭据已失效，请返回首页重新连接。")}
+        </p>
+        <button
+          className="primary"
+          disabled={busy}
+          onClick={() =>
+            work(async () => {
+              await loadHost();
+            })
+          }
+        >
+          {busy ? "正在连接…" : "重试连接"}
+        </button>
+        {window.CodexNative && (
+          <button onClick={() => window.CodexNative!.home()}>返回首页</button>
+        )}
+      </main>
+    );
+  if (paired === false)
     return (
       <div className="pair-page">
         <div className="pair-art">
@@ -795,7 +857,18 @@ function App() {
                 {permissionLabel(snapshot?.permissions)}
               </button>
             </div>
-            <div className="messages" aria-live="polite">
+            <div
+              className="messages"
+              aria-live="polite"
+              onScroll={(event) => {
+                const element = event.currentTarget;
+                followOutput.current =
+                  element.scrollHeight -
+                    element.scrollTop -
+                    element.clientHeight <
+                  100;
+              }}
+            >
               {snapshot?.nextCursor && (
                 <button
                   className="history-more"
@@ -808,7 +881,7 @@ function App() {
                 </button>
               )}
               {!snapshot && <p className="muted loading">正在读取会话…</p>}
-              {snapshot && !currentThread?.turns.length && (
+              {snapshot && !currentThread?.turns.length && !active && (
                 <div className="empty-chat">
                   <Icon name="code" size={32} />
                   <h3>说说你想做什么</h3>
@@ -835,6 +908,16 @@ function App() {
                   )}
                 </div>
               ))}
+              {(active || busy) && (
+                <div className="agent-activity" role="status">
+                  <span className="activity-dot" />
+                  {snapshot?.approvals.length
+                    ? "等待你的审批"
+                    : active
+                      ? activityLabel(activeTurn)
+                      : "正在提交任务…"}
+                </div>
+              )}
               <div ref={bottom} />
             </div>
             {!!snapshot?.approvals.length && (
@@ -1255,7 +1338,7 @@ function Message({
     );
   if (item.type === "commandExecution")
     return (
-      <details className="tool-item">
+      <details className="tool-item" open={item.status === "inProgress"}>
         <summary>
           <Icon name="code" size={15} />
           <span>{item.command || "执行命令"}</span>
@@ -1301,7 +1384,45 @@ function Message({
         <div className="prose">{item.text}</div>
       </div>
     );
-  if (item.type === "reasoning") return null;
+  if (item.type === "taskPlan")
+    return (
+      <div className="plan task-plan">
+        <span className="eyebrow">任务计划</span>
+        {item.explanation && <p>{item.explanation}</p>}
+        <ol>
+          {item.plan?.map((step: any, index: number) => (
+            <li key={index} data-status={step.status}>
+              <span>
+                {step.status === "completed"
+                  ? "✓"
+                  : step.status === "inProgress"
+                    ? "●"
+                    : "○"}
+              </span>{" "}
+              {step.step}
+            </li>
+          ))}
+        </ol>
+      </div>
+    );
+  if (item.type === "reasoning")
+    return (
+      <details
+        className="tool-item reasoning"
+        open={item.status === "inProgress"}
+      >
+        <summary>
+          <span>思考摘要</span>
+          <small>{item.status === "inProgress" ? "思考中" : "已完成"}</small>
+        </summary>
+        <div className="prose">
+          {item.summary?.filter(Boolean).join("\n\n") ||
+            (item.status === "inProgress"
+              ? "正在等待模型提供摘要…"
+              : "本轮模型未提供摘要。")}
+        </div>
+      </details>
+    );
   return (
     <details className="tool-item">
       <summary>

@@ -4,6 +4,8 @@
 
 **2026-11-01 / 0.3.0 更新**：消息附件流式上传到当前会话运行主机，图片作为 `localImage`，音频和文件供工具读取。Android 聊天页内可选择电脑会话或手机本地会话，保留配对并复用手机本地 API。新入口见 `AttachmentUpload.java`、`ProjectFiles.upload/attachment` 与共享发送栏；验证范围见 [0.3.0 验证记录](docs/validation-2026-11-01.md)。
 
+**2026-11-01 / 0.3.1 更新**：原生连接检查使用已保存凭据，不再显示网页八位码表单；`src/shared/live.ts` 共用实时摘要/计划/工具/回复投影，HTTP 快照按事件序号重放。历史分页遇到 CLI -32601 时回退到 `thread/read`。本轮验证与服务/设备边界见 [0.3.1 验证记录](docs/validation-0.3.1.md)。
+
 ## 先建立上下文
 
 1. 查看 `git status --short --branch` 和最近提交，保留现有改动；当前工作从现有分支继续，新建分支默认使用 `codex/` 前缀。
@@ -15,7 +17,7 @@
 | 调整架构、协议或跨端行为         | [架构](docs/architecture.md)、[版本协议](protocol/version.json)、`protocol/v2/`       |
 | Windows/Android 启动、安装或打包 | [双端 App 指南](docs/native-apps.md)                                                  |
 | CLI、网页开发、自定义服务与探针  | [运行说明](docs/running.md)                                                           |
-| 判断哪些能力已验证、安排下一步   | [验证记录](docs/validation-2026-10-31.md)、[路线图](docs/roadmap.md)                  |
+| 判断哪些能力已验证、安排下一步   | [0.3.1 验证](docs/validation-0.3.1.md)、[早期验证](docs/validation-2026-10-31.md)、[路线图](docs/roadmap.md) |
 | 扩展产品范围                     | [产品需求](docs/product.md)、[安装版规格](.scratch/native-apps/spec.md)及其 `issues/` |
 | 修改运行环境或参考 dsh-Go        | [来源与许可证](runtime/NOTICE.md)、[参考源码分析](docs/references/dsh-go.md)          |
 
@@ -61,7 +63,7 @@ npm test
 npm run build
 ```
 
-`npm test` 使用本地 fixture/HTTP/SSE，无需模型密钥。主机行为修改重点覆盖 `tests/host.test.ts`，连接码覆盖 `tests/connection.test.ts`，轮询客户端覆盖 `tests/events.test.ts`。验证应覆盖行为边界，不为简单文字或样式改动添加镜像测试。
+`npm test` 使用本地 fixture/HTTP/SSE，无需模型密钥。主机行为修改重点覆盖 `tests/host.test.ts`，连接码覆盖 `tests/connection.test.ts`，轮询客户端覆盖 `tests/events.test.ts`，实时通知和快照重放覆盖 `tests/live.test.ts`。验证应覆盖行为边界，不为简单文字或样式改动添加镜像测试。
 
 启动 CLI/网页原型时用隔离工作目录：
 
@@ -79,6 +81,7 @@ CLI 默认端口 **7331**，Windows App 默认 **7332**，Android 本地主机�
 | `npm run probe -- --run --output .local/probe.json`                       | 真实模型在临时项目中修改文件，并验证重启后同一会话恢复。                                                  |
 | `npm run probe:desktop -- --run --output .local/desktop-integration.json` | 桌面项目发现、真实文件交付、下载和权限恢复。                                                              |
 | `npx tsx tools/probe-native.ts`                                           | 验证已生成的 `dist/native/host.cjs` 与内置 Windows CLI；按 Android 本地入口检查默认权限，并调用真实模型。 |
+| `npx tsx tools/probe-native.ts --stream`                                  | 同上，额外核对回复增量早于任务完成，记录工具事件及公开摘要增量数量。 |
 | `npx tsx tools/probe-tunnel.ts`                                           | 使用内置 cloudflared 创建临时公网隧道，配对并通过轮询接收真实模型回复，结束后关闭测试服务。               |
 
 后三类模型探针及 `--run` 会产生 API 用量，使用当前任务已获授权的服务配置；用隔离目录和新会话，保留可复查证据。现有用户对话仅做必要的只读检查，不向其发送测试消息。真实服务配置、密钥和响应中的敏感内容不写入仓库或日志。

@@ -1,6 +1,6 @@
 # 架构说明
 
-状态：0.2.0 提供 Windows/Android 预发布安装包；本文说明当前实现及后续设计方向。安装包流程及设备验证边界见[双端 App](native-apps.md)，已有协议验证见[验证记录](validation-2026-10-31.md)。
+状态：当前源码和本地安装包为 0.3.1，GitHub Releases 仍为 0.2.0；本文说明当前实现及后续设计方向。安装包流程及设备验证边界见[双端 App](native-apps.md)，本轮证据见 [0.3.1 验证记录](validation-0.3.1.md)。
 
 ## 当前实现
 
@@ -8,15 +8,20 @@
 
 Android 的系统文档选择器通过原生网络层直接上传，不把文件转为 JavaScript Base64。内置聊天页提供电脑会话与手机本地会话入口，共用原有本地引擎与 Keystore API 配置；运行主机分别拥有项目和会话，入口选择不迁移数据或撤销配对。
 
+0.3.1 使用 `src/shared/live.ts` 在主机和前端共同投影轮次、条目生命周期、公开思考摘要、计划、工具输出和回复增量。`turn/start` 请求 `summary: "auto"`；界面只显示 `reasoning.summary`，是否返回摘要取决于模型服务。`turn/plan/updated` 投影为计划条目，持久历史合并时保留通知中的计划。原生连接检查与未配对状态分开，八位码表单只用于普通网页首次配对。
+
+会话快照携带 `eventSeq` 和 `eventEpoch`；客户端保留最近 2000 个事件，重放快照之后的通知，进程变化或事件缺口时清空日志并补载。读取更早历史时保留当前任务状态。历史优先使用 `thread/turns/list`；CLI 返回方法不支持（-32601）时改用 `thread/read(includeTurns: true)`，按每页 20 轮返回 `history:N` 游标，兼容当前实际运行的后端。
+
 - `src/host/rpc.ts`：管理官方 App Server 子进程和 stdio JSON-RPC，处理通知、回调、超时与退出。
 - `src/host/service.ts`：提供会话/任务接口、审批路由、事件序号与缓存，持久化操作意图以防重复提交。
 - `src/host/projects.ts`：校验真实授权路径，包括符号链接与 Windows junction；展示根目录和直接子目录。
 - `src/host/auth.ts`：单次短时配对、设备凭据哈希、有效期与撤销。
 - `src/host/server.ts`：同源 HTTP API、SSE 与事件轮询，校验 Host/Origin，仅公开具体业务操作。
+- `src/shared/live.ts`：跨端实时通知投影、快照事件重放和任务活动文字。
 - `src/web/`：React 手机网页入口，按当前主机和选中会话恢复历史与审批，不自动重发指令。
 - `src/host/runtime.ts`：可嵌入的启动/停止生命周期、动态连接地址与连接码。
 - `src/desktop/`：Electron 仅管理控制界面；独立 Node 后台进程持有主机、内置 CLI、持久配对和默认启动的 Cloudflare HTTPS 隧道。窗口与后台通过带随机凭据的本机管道通信，退出界面不结束后台；再次打开复用现有进程。
-- `apps/android/`：原生 Activity、Keystore、受限 API/SSE 桥接、系统文件保存、前台服务与事务式 Linux 环境安装。HTTPS 连接使用每秒事件轮询以适配临时隧道，LAN/本地使用 SSE；二者共用事件序号、进程标识及缺口恢复。原生桥只暴露给 APK 内置界面，远端页面不能获得桥接能力。
+- `apps/android/`：原生 Activity、Keystore、受限 API/SSE 桥接、系统文件保存、前台服务与事务式 Linux 环境安装。HTTPS 使用自适应事件轮询以适配临时隧道（响应后有事件等 200 ms、空闲等 700 ms），LAN/本地使用 SSE；二者共用事件序号、进程标识及缺口恢复。原生桥只暴露给 APK 内置界面，远端页面不能获得桥接能力。
 - `tools/`：生成版本特定协议，运行真实协议/模型探针与 Android/Linux 检查入口。
 
 本轮选择 TypeScript + Fastify 主机和 React/Vite 网页，以尽快验证真实协议链路。模型密钥沿用 Codex 主机配置，或仅通过子进程环境注入；状态文件不保存 API Key。设备与提交意图保存在可配置的 `.runtime/`。

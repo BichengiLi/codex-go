@@ -91,15 +91,33 @@ try {
     await attachmentResponse.clone().text(),
   );
   const attachment = await attachmentResponse.json();
+  const streamProbe = process.argv.includes("--stream");
+  let eventCursor = attached.eventSeq;
+  const notifications: { method: string; seq: number }[] = [];
   await api(`/threads/${thread.id}/turns`, "POST", {
-    text: "请只读取附件的文本，不修改文件，只回复文件中指定的 reply token。",
+    text: streamProbe
+      ? "请先简短说明将读取附件，再只读取附件的文本，不修改文件。回复文件中指定的 reply token，然后用四个简短句子说明附件已经读取和工作已完成。"
+      : "请只读取附件的文本，不修改文件，只回复文件中指定的 reply token。",
     attachments: [attachment.path],
     requestId: randomUUID(),
   });
   let snapshot: any;
   const deadline = Date.now() + 120000;
   do {
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    await new Promise((resolve) =>
+      setTimeout(resolve, streamProbe ? 200 : 800),
+    );
+    if (streamProbe) {
+      const replay = await api(
+        `/event-poll?after=${eventCursor}&epoch=${attached.eventEpoch}`,
+      );
+      notifications.push(
+        ...replay.events
+          .filter((event: any) => event.params.threadId === thread.id)
+          .map((event: any) => ({ method: event.method, seq: event.seq })),
+      );
+      eventCursor = replay.seq;
+    }
     snapshot = await api(`/threads/${thread.id}`);
     for (const approval of snapshot.approvals ?? [])
       await api(`/approvals/${approval.id}`, "POST", { decision: "accept" });
@@ -114,6 +132,18 @@ try {
     text.includes("native-bundle-attachment-ok"),
     "Uploaded attachment was not read",
   );
+  if (streamProbe) {
+    const firstDelta = notifications.findIndex(
+      (event) => event.method === "item/agentMessage/delta",
+    );
+    const completed = notifications.findIndex(
+      (event) => event.method === "turn/completed",
+    );
+    assert.ok(
+      firstDelta >= 0 && completed > firstDelta,
+      "Expected reply deltas before completion",
+    );
+  }
   const evidence = {
     bundledHost: true,
     authenticatedHttp: true,
@@ -122,6 +152,20 @@ try {
     localDefaultPermissions: attached.permissions,
     modelReplied: true,
     uploadedAttachmentReadByModel: true,
+    ...(streamProbe
+      ? {
+          replyDeltasBeforeCompletion: true,
+          notificationMethods: [
+            ...new Set(notifications.map((event) => event.method)),
+          ],
+          replyDeltaCount: notifications.filter(
+            (event) => event.method === "item/agentMessage/delta",
+          ).length,
+          reasoningSummaryDeltaCount: notifications.filter(
+            (event) => event.method === "item/reasoning/summaryTextDelta",
+          ).length,
+        }
+      : {}),
     threadId: thread.id,
   };
   await writeFile(

@@ -30,6 +30,9 @@ const wanted = [
   "ThreadSettingsUpdatedNotification",
   "PermissionProfileListParams",
   "PermissionProfileListResponse",
+  "ReasoningSummaryTextDeltaNotification",
+  "ReasoningSummaryPartAddedNotification",
+  "TurnPlanUpdatedNotification",
 ];
 await mkdir("protocol/v2", { recursive: true });
 for (const name of wanted)
@@ -55,7 +58,7 @@ await writeFile(
       generatedBy: "codex app-server generate-json-schema --experimental",
       contract: "v2",
       notes:
-        "Committed subset includes experimental desktop projects and permission settings. Full schemas can be regenerated locally.",
+        "Committed subset includes experimental desktop projects, permission settings, public reasoning summary deltas and plan notifications. Full schemas can be regenerated locally.",
     },
     null,
     2,

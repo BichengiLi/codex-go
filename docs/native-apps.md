@@ -1,6 +1,6 @@
 # Windows 与 Android App
 
-0.3.0 本地更新增加消息附件和聊天页内的手机本地会话入口。下面的 v0.2.0 链接仍指向已发布版本；本地新包位于 `.local/releases/0.3.0/`。
+0.3.1 本地更新修复已配对手机重复显示八位码表单，增加实时任务进展；包含 0.3.0 的消息附件和手机本地会话入口。下面的 v0.2.0 链接仍指向已发布版本；本地新包位于 `.local/releases/0.3.1/`。
 
 0.2.0 提供 Windows 安装程序、免安装 ZIP 和 ARM64 Android APK。日常使用直接打开 App。Android 需要 Android 8.0 或更新系统；本地环境约需 1.5 GB 可用空间。
 
@@ -60,6 +60,14 @@ CLI/网页入口保持默认七天配对策略。电脑端长期设备凭据可�
 
 附件与现有文件浏览、下载使用相同配对鉴权和项目路径边界；不接受覆盖配置文件、私有路径或越界链接。Android 仅向选定运行主机流式发送系统授予访问的文档，文件字节与模型 Key 不进入网页桥接消息。
 
+## 连接状态与实时进展（0.3.1）
+
+原生 App 在扫码、粘贴完整连接码、恢复电脑连接或进入手机本地环境后，直接验证已有凭据，连接期间显示状态。凭据失效时可以重试或返回首页重新连接。普通网页首次配对仍使用八位码表单。
+
+任务执行时即时更新计划、工具开始与结束、命令输出和回复，正在执行的工具默认展开。思考摘要来自模型服务；服务未返回摘要时显示任务活动状态。阅读历史时暂停自动滚动，回到底部或提交新任务后跟随新输出。
+
+本地和局域网使用 SSE。HTTPS 事件轮询继续适配 Cloudflare 临时隧道，每次响应后有事件等待 200 ms、空闲等待 700 ms，再发起下一次请求。实际可见延迟还取决于网络和模型服务。迟到的历史响应会补上快照后的通知，避免回复回退。
+
 ## 构建
 
 需要 Node 22.12+、Python 3.11+、curl；Android 还需要 JDK 17、Android SDK 34，处理 Ubuntu deb 时需要 Python `zstandard`。生成物和机器路径已加入忽略规则。
@@ -81,16 +89,20 @@ CI 显式安装 platform-tools、Android 34 platform 与 Build Tools 34.0.0，�
 
 运行环境输入固定在构建脚本及 `runtime/` 锁文件中，下载后校验哈希，APK 携带运行环境与原生库清单。安装先写入临时目录，验证和解压完成后切换，失败保留原环境；持久项目目录与运行环境分开。大体积二进制不提交 Git。
 
-APK 中的压缩环境使用 `runtime.tgz`，避免 Android 资源合并器自动展开 `.gz` 后更名。构建配置保留压缩归档原字节，避免重复压缩造成构建堆内存不足。最终交付前，把 Windows 安装程序/ZIP 和 APK 放入 `.local/releases/0.3.0/`，APK 命名为 `Codex-Go-0.3.0-Android-arm64.apk`，执行 `python tools/verify-packages.py`。脚本从根目录 package.json 读取版本，校验实际包内文件、运行环境/原生库哈希、必要执行文件及归档 CRC，并输出 `release-manifest.json` 和 `SHA256SUMS.txt`。APK 签名另用 Android SDK 的 `apksigner verify --verbose` 检查。
+APK 中的压缩环境使用 `runtime.tgz`，避免 Android 资源合并器自动展开 `.gz` 后更名。构建配置保留压缩归档原字节，避免重复压缩造成构建堆内存不足。最终交付前，把 Windows 安装程序/ZIP 和 APK 放入 `.local/releases/0.3.1/`，APK 命名为 `Codex-Go-0.3.1-Android-arm64.apk`，执行 `python tools/verify-packages.py`。脚本从根目录 package.json 读取版本，校验实际包内文件、运行环境/原生库哈希、必要执行文件及归档 CRC，并输出 `release-manifest.json` 和 `SHA256SUMS.txt`。APK 签名另用 Android SDK 的 `apksigner verify --verbose` 检查。
 
 ```powershell
 # 已打包的主机及真实模型验证（只创建隔离测试项目和新会话）
 npx tsx tools/probe-native.ts
+# 观察真实模型的分段回复、工具事件及服务返回的摘要数量
+npx tsx tools/probe-native.ts --stream
 # 临时公网 HTTPS 配对及鉴权读取，结束后自动关闭测试隧道
 npx tsx tools/probe-tunnel.ts
 ```
 
 ## 验证范围
+
+0.3.1 的 27 项自动测试、窄屏 SSE/轮询界面检查、真实模型流式探针和双端产物检查见 [0.3.1 验证记录](validation-0.3.1.md)。真实探针收到 33 段回复及工具事件，本次服务未返回思考摘要；摘要显示另由 fixture 验证。
 
 当前已完成双端构建、Android lint、21 项主机/后台/协议测试及 2 项 Android 模型配置单元测试、打包主机的真实模型回复，以及 Cloudflare 公网 HTTPS 地址的配对、鉴权读取与真实模型事件轮询。新版 Windows 开发版已检查渐入首页和下滑二维码，无控制台错误或横向溢出；窗口进程退出后，原 HTTPS 隧道完成真实配对、鉴权读取和设备撤销。
 

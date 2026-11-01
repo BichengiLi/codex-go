@@ -759,6 +759,17 @@ h1 {
   align-items: center;
   gap: 8px;
 }
+.connection-page { min-height:100dvh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:30px; text-align:center; background:#0c1012; color:#dce7df; }
+.connection-page h2,.connection-page p { margin:0; }
+.connection-page > button { min-height:44px; }
+.agent-activity { display:flex; align-items:center; gap:9px; padding:16px 8px; color:#bdddc8; font-size:12px; }
+.activity-dot { width:7px; height:7px; border-radius:50%; background:#bdddc8; animation:activity-pulse 1.4s ease-in-out infinite; }
+.reasoning .prose { padding:12px; color:#a9c3b3; white-space:pre-wrap; line-height:1.7; }
+.task-plan ol { margin:10px 0 0; padding:0; list-style:none; }
+.task-plan li { padding:5px 0; line-height:1.6; }
+.task-plan li[data-status="inProgress"] { color:#bdddc8; }
+@keyframes activity-pulse { 50% { opacity:.35; } }
+@media(prefers-reduced-motion:reduce) { .activity-dot { animation:none; } }
 .attachment-tools > span {
   font-size: 10px;
   color: var(--muted);
