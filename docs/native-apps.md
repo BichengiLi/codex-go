@@ -1,16 +1,18 @@
 # Windows 与 Android App
 
-0.3.1 预发布版修复已配对手机重复显示八位码表单，增加实时任务进展；包含 0.3.0 的消息附件和手机本地会话入口。本机交付归档位于 `.local/releases/0.3.1/`，公开下载见下方。
+**0.3.2 / Android versionCode 5** 修复手机本地环境升级时的目录权限错误。旧环境中的 PRoot 绑定占位目录可能不可读，清理前恢复应用所有者权限；项目和会话所在的 `home` 独立保留。手机覆盖升级和本地引擎启动已实测，验证见 [0.3.2 验证记录](validation-0.3.2.md)。安装包归档为 `.local/releases/0.3.2/`，公开下载见下方。
 
-0.3.1 提供 Windows 安装程序、免安装 ZIP 和 ARM64 Android APK。日常使用直接打开 App。Android 需要 Android 8.0 或更新系统；本地环境约需 1.5 GB 可用空间。
+本版包含 0.3.1 的已配对连接检查和实时任务进展，以及 0.3.0 的消息附件和手机本地会话入口。
+
+0.3.2 提供 Windows 安装程序、免安装 ZIP 和 ARM64 Android APK。日常使用直接打开 App。Android 需要 Android 8.0 或更新系统；本地环境约需 1.5 GB 可用空间。
 
 ## 安装与升级
 
-从 [v0.3.1 发布页](https://github.com/BichengiLi/codex-go/releases/tag/v0.3.1) 下载：
+从 [v0.3.1 发布页](https://github.com/BichengiLi/codex-go/releases/tag/v0.3.2) 下载：
 
-- [Windows x64 安装程序](https://github.com/BichengiLi/codex-go/releases/download/v0.3.1/Codex-Go-0.3.1-Windows-x64.exe)：按提示安装，再打开 Codex Go。
-- [Windows x64 ZIP](https://github.com/BichengiLi/codex-go/releases/download/v0.3.1/Codex-Go-0.3.1-Windows-x64.zip)：完整解压后运行 `Codex Go.exe`。
-- [Android ARM64 APK](https://github.com/BichengiLi/codex-go/releases/download/v0.3.1/Codex-Go-0.3.1-Android-arm64.apk)：在 Android 8.0+ ARM64 手机上允许安装此来源的应用，完成侧载。
+- [Windows x64 安装程序](https://github.com/BichengiLi/codex-go/releases/download/v0.3.2/Codex-Go-0.3.2-Windows-x64.exe)：按提示安装，再打开 Codex Go。
+- [Windows x64 ZIP](https://github.com/BichengiLi/codex-go/releases/download/v0.3.2/Codex-Go-0.3.2-Windows-x64.zip)：完整解压后运行 `Codex Go.exe`。
+- [Android ARM64 APK](https://github.com/BichengiLi/codex-go/releases/download/v0.3.2/Codex-Go-0.3.2-Android-arm64.apk)：在 Android 8.0+ ARM64 手机上允许安装此来源的应用，完成侧载。
 
 安装版已包含所需运行时，使用电脑模式前仍需为电脑当前用户配置可用的 Codex 模型服务。当前 Windows 包未配置代码签名，Android 包使用调试签名；校验文件与运行环境信息随发布页提供。
 
@@ -18,7 +20,7 @@
 
 Windows 更新前在旧版“连接与项目设置”中主动断开连接，再关闭控制界面，确保旧后台及其内置工具退出；新版启动后按需重新扫码。ZIP 版解压到新目录，停止旧版后再运行新版，避免混用两个版本的后台进程。
 
-本次版本为 0.3.1，Android versionCode 4；已发布的 v0.2.0 保持不变。
+本次版本为 0.3.2，Android versionCode 5；已发布的历史版本保持不变。
 
 ## 连接电脑的完整流程
 
@@ -89,7 +91,7 @@ CI 显式安装 platform-tools、Android 34 platform 与 Build Tools 34.0.0，�
 
 运行环境输入固定在构建脚本及 `runtime/` 锁文件中，下载后校验哈希，APK 携带运行环境与原生库清单。安装先写入临时目录，验证和解压完成后切换，失败保留原环境；持久项目目录与运行环境分开。大体积二进制不提交 Git。
 
-APK 中的压缩环境使用 `runtime.tgz`，避免 Android 资源合并器自动展开 `.gz` 后更名。构建配置保留压缩归档原字节，避免重复压缩造成构建堆内存不足。最终交付前，把 Windows 安装程序/ZIP 和 APK 放入 `.local/releases/0.3.1/`，APK 命名为 `Codex-Go-0.3.1-Android-arm64.apk`，执行 `python tools/verify-packages.py`。脚本从根目录 package.json 读取版本，校验实际包内文件、运行环境/原生库哈希、必要执行文件及归档 CRC，并输出 `release-manifest.json` 和 `SHA256SUMS.txt`。APK 签名另用 Android SDK 的 `apksigner verify --verbose` 检查。
+APK 中的压缩环境使用 `runtime.tgz`，避免 Android 资源合并器自动展开 `.gz` 后更名。构建配置保留压缩归档原字节，避免重复压缩造成构建堆内存不足。最终交付前，把 Windows 安装程序/ZIP 和 APK 放入 `.local/releases/0.3.2/`，APK 命名为 `Codex-Go-0.3.2-Android-arm64.apk`，执行 `python tools/verify-packages.py`。脚本从根目录 package.json 读取版本，校验实际包内文件、运行环境/原生库哈希、必要执行文件及归档 CRC，并输出 `release-manifest.json` 和 `SHA256SUMS.txt`。APK 签名另用 Android SDK 的 `apksigner verify --verbose` 检查。
 
 ```powershell
 # 已打包的主机及真实模型验证（只创建隔离测试项目和新会话）
@@ -108,4 +110,4 @@ npx tsx tools/probe-tunnel.ts
 
 Cloudflare 临时隧道不支持 SSE，因此 HTTPS 手机连接和临时隧道网页使用相同序号/进程标识的 JSON 轮询协议；局域网和手机本地继续使用 SSE。事件缺口会触发历史补载，轮询不重新发送任务。依据见 [Quick Tunnels 限制](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/)。
 
-本机未连接 Android 设备，也没有可用模拟器镜像。因此 Android 安装后的配对、文件保存窗口、PRoot 启动、工具执行、后台存活与恢复尚未完成设备验收。编译和静态归档校验不能替代这些结果。桌面 App 正在执行的任务接管、跨主机文件/会话迁移和 iOS 也不在本版已验证范围内。
+2026-11-02 已通过 USB 在 API 36 的 ARM64 手机验证 0.3.2 覆盖升级、环境清理、PRoot/Node/Codex 本地启动及聊天页连接，并核对原工作区和会话历史保留；同日扫码配对、局域网和公网连接也已实测。手机本地模型任务、文件保存窗口、工具执行、后台存活与恢复仍待设备验收。编译和静态归档校验不能替代这些结果。桌面 App 正在执行的任务接管、跨主机文件/会话迁移和 iOS 也不在本版已验证范围内。

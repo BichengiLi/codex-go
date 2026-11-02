@@ -37,6 +37,6 @@ jobs:
           log-accepted-android-sdk-licenses: false
       - run: npm ci
       - run: npm run build:native
-      # Compile/lint the native client; full ARM64 runtime is built separately.
-      - run: sh gradlew :app:assembleDebug :app:lintDebug --console plain
+      # Compile/test/lint the native client; full ARM64 runtime is built separately.
+      - run: sh gradlew :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --console plain
         working-directory: apps/android
