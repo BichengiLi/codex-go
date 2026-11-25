@@ -7,6 +7,9 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { startHost } from "../host/runtime.js";
 import { controlAddress } from "./control.js";
 
+declare const BUNDLED_CLOUDFLARED_SHA256: string;
+const windows = process.platform === "win32";
+
 type Config = {
   directory: string;
   resources: string;
@@ -66,7 +69,7 @@ async function start() {
     command:
       config.command ??
       process.env.CODEX_BIN ??
-      path.join(config.resources, "codex/bin/codex.exe"),
+      path.join(config.resources, "codex", "bin", windows ? "codex.exe" : "codex"),
     commandArgs: config.commandArgs,
     webRoot: path.join(config.resources, "web"),
     persistentDevices: true,
@@ -75,12 +78,12 @@ async function start() {
 async function enableInternet() {
   if (!runtime || tunnel) return;
   const host = runtime;
-  const binary = path.join(config.resources, "cloudflared.exe");
+  const binary = path.join(config.resources, windows ? "cloudflared.exe" : "cloudflared");
   if (
+    typeof BUNDLED_CLOUDFLARED_SHA256 !== "string" ||
     createHash("sha256")
       .update(await readFile(binary))
-      .digest("hex") !==
-    "2493dbc168923bb3e59e5e7716f71deced92992eea9acd6e9d74f84ac7751343"
+      .digest("hex") !== BUNDLED_CLOUDFLARED_SHA256
   )
     throw new Error("外网组件校验失败，请重新安装。");
   await new Promise<void>((resolve, reject) => {
@@ -185,7 +188,7 @@ async function action(name: string, value?: string) {
     else if (name === "chat" && runtime) {
       const paired = await runtime.pairing.pair(
         runtime.pairing.issue(),
-        "Windows 本机",
+        process.platform === "darwin" ? "Mac 本机" : "Windows 本机",
       );
       runtime.refreshCode();
       return { url: runtime.localUrl, token: paired.token };
@@ -238,7 +241,7 @@ server.once("error", () => {
   void stop().finally(() => process.exit(1));
 });
 server.listen(address, async () => {
-  if (process.platform !== "win32") await chmod(address, 0o600);
+  if (!windows) await chmod(address, 0o600);
   busy = true;
   try {
     await start();
@@ -257,7 +260,7 @@ async function shutdown() {
   clearInterval(refresh);
   await stop();
   server.close();
-  if (process.platform !== "win32") await unlink(address).catch(() => {});
+  if (!windows) await unlink(address).catch(() => {});
   process.exit(0);
 }
 process.on("SIGTERM", () => void shutdown());

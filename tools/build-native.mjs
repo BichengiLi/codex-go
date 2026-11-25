@@ -1,8 +1,11 @@
 import { build } from "esbuild";
-import { mkdir, cp, writeFile, readFile } from "node:fs/promises";
+import { chmod, mkdir, cp, writeFile, readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
+import codexInputs from "../runtime/codex.lock.json" with { type: "json" };
+import tunnelInputs from "../runtime/cloudflared.lock.json" with { type: "json" };
+
 async function download(url, file) {
   try {
     return await readFile(file);
@@ -25,8 +28,47 @@ async function download(url, file) {
   );
   return readFile(file);
 }
-const root = path.resolve("dist/native");
+async function stageDesktopRuntime(target, resources) {
+  const macos = target.startsWith("darwin-");
+  const cache = path.resolve(".local/downloads");
+  const codex = codexInputs[target];
+  const codexArchive = path.join(cache, macos ? `${target}/codex.tgz` : "codex-win.tgz");
+  const extracted = path.join(cache, macos ? target : "codex-win");
+  await mkdir(extracted, { recursive: true });
+  const codexBytes = await download(codex.url, codexArchive);
+  const [algorithm, expected] = codex.integrity.split("-");
+  if (createHash(algorithm).update(codexBytes).digest("base64") !== expected)
+    throw new Error(`Codex integrity failed for ${target}`);
+  execFileSync("tar", ["-xf", codexArchive, "-C", extracted]);
+  await cp(path.join(extracted, "package/vendor", codex.vendor), path.join(resources, "codex"), {
+    recursive: true,
+  });
+
+  const tunnel = tunnelInputs[target];
+  const binary = path.join(resources, macos ? "cloudflared" : "cloudflared.exe");
+  const archive = macos ? path.join(extracted, "cloudflared.tgz") : binary;
+  const tunnelBytes = await download(tunnel.url, archive);
+  if (createHash("sha256").update(tunnelBytes).digest("hex") !== tunnel.sha256)
+    throw new Error(`cloudflared integrity failed for ${target}`);
+  if (!macos) return tunnel.sha256;
+
+  execFileSync("tar", ["-xf", archive, "-C", extracted]);
+  await cp(path.join(extracted, "cloudflared"), binary);
+  await chmod(binary, 0o755);
+  return createHash("sha256").update(await readFile(binary)).digest("hex");
+}
+
+const macos = process.argv.includes("--macos");
+const target = macos ? `darwin-${process.arch}` : process.argv.includes("--windows") ? "win32-x64" : undefined;
+if (macos && (process.platform !== "darwin" || !codexInputs[target]))
+  throw new Error("Build the macOS package on an arm64 or x64 Mac.");
+const root = path.resolve(macos ? `dist/native-macos-${process.arch}` : "dist/native");
 await mkdir(root, { recursive: true });
+const resources = path.join(root, "resources");
+await mkdir(resources, { recursive: true });
+const cloudflaredSha256 = target
+  ? await stageDesktopRuntime(target, resources)
+  : tunnelInputs["win32-x64"].sha256;
 await build({
   entryPoints: ["src/desktop/main.ts"],
   bundle: true,
@@ -56,6 +98,7 @@ await build({
 await build({
   entryPoints: ["src/desktop/agent.ts"], bundle: true, platform: "node", format: "esm",
   outfile: root + "/resources/agent.mjs",
+  define: { BUNDLED_CLOUDFLARED_SHA256: JSON.stringify(cloudflaredSha256) },
   banner: { js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
 });
 await build({ entryPoints: ["src/desktop/renderer.js"], bundle: true, platform: "browser", outfile: root + "/renderer.js" });
@@ -77,40 +120,10 @@ await writeFile(
   root + "/package.json",
   JSON.stringify({
     name: "codex-go-desktop",
-    version: "0.2.0",
+    version: JSON.parse(await readFile("package.json", "utf8")).version,
     main: "main.mjs",
     description: "Codex Go computer connection agent",
     author: "BichengiLi",
   }),
 );
-if (process.argv.includes("--windows")) {
-  await mkdir(".local/downloads", { recursive: true });
-  const pin = JSON.parse(await readFile("runtime/codex.lock.json", "utf8"))[
-    "win32-x64"
-  ];
-  const archive = await download(pin.url, ".local/downloads/codex-win.tgz");
-  const [algorithm, expected] = pin.integrity.split("-");
-  if (createHash(algorithm).update(archive).digest("base64") !== expected)
-    throw new Error("Codex integrity failed");
-  const tar = ".local/downloads/codex-win.tgz";
-  await writeFile(tar, archive);
-  await mkdir(".local/downloads/codex-win", { recursive: true });
-  execFileSync("tar", ["-xf", tar, "-C", ".local/downloads/codex-win"]);
-  await cp(
-    ".local/downloads/codex-win/package/vendor/x86_64-pc-windows-msvc",
-    root + "/resources/codex",
-    { recursive: true },
-  );
-  const cloudfile = root + "/resources/cloudflared.exe";
-  const cloud = await download(
-    "https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/cloudflared-windows-amd64.exe",
-    cloudfile,
-  );
-  if (
-    createHash("sha256").update(cloud).digest("hex") !==
-    "2493dbc168923bb3e59e5e7716f71deced92992eea9acd6e9d74f84ac7751343"
-  )
-    throw new Error("cloudflared integrity failed");
-  await writeFile(cloudfile, cloud);
-}
 console.log("Native sources built: " + root);

@@ -7,12 +7,20 @@ import {
   session,
 } from "electron";
 import path from "node:path";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdirSync } from "node:fs";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { agentRequest, controlAddress } from "./control.js";
 
 app.setName("Codex Go");
+const userData = app.commandLine.getSwitchValue("user-data-dir");
+if (userData) {
+  const directory = path.resolve(userData);
+  mkdirSync(directory, { recursive: true });
+  app.setPath("userData", directory);
+  app.setPath("sessionData", directory);
+}
 const primary = app.requestSingleInstanceLock();
 if (!primary) app.quit();
 let window: BrowserWindow;
@@ -21,7 +29,7 @@ let token = "",
 let polling: ReturnType<typeof setInterval> | undefined;
 const resources = app.isPackaged
   ? process.resourcesPath
-  : path.resolve("dist/native/resources");
+  : path.join(import.meta.dirname, "resources");
 const request = (action: string, value?: string) =>
   agentRequest(address, token, action, value);
 
@@ -36,7 +44,15 @@ async function ensureAgent() {
   if (token) {
     try {
       return await request("state");
-    } catch {}
+    } catch (error) {
+      // A process killed before closing its Unix socket leaves an unusable path.
+      if (
+        process.platform !== "win32" &&
+        (error as NodeJS.ErrnoException).code === "ECONNREFUSED"
+      ) {
+        await unlink(address).catch(() => {});
+      }
+    }
   }
   token ||= randomBytes(32).toString("hex");
   let workspace = path.join(app.getPath("documents"), "CodexGo");

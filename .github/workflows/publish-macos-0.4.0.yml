@@ -1,0 +1,46 @@
+name: Upload verified macOS 0.4.0 installers
+on:
+  push:
+    branches: [codex/publish-macos-0.4.0]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: v0.4.0
+      VERIFIED_RUN: "45609423188"
+      VERIFIED_SHA: 796f5b092f90d875285471b4352f7efb7ca98557
+    steps:
+      - name: Verify the draft tag and build provenance
+        run: |
+          tag_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_TAG" --jq .sha)"
+          test "$tag_sha" = "$VERIFIED_SHA"
+          gh run view "$VERIFIED_RUN" --repo "$GITHUB_REPOSITORY" --json headSha,conclusion |
+            jq -e --arg sha "$VERIFIED_SHA" '.headSha == $sha and .conclusion == "success"'
+          test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = true
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ env.VERIFIED_RUN }}
+          pattern: codex-go-macos-*
+          merge-multiple: true
+          path: packages
+      - name: Upload and verify release assets
+        working-directory: packages
+        run: |
+          files=(Codex-Go-0.4.0-macOS-{arm64,x64}.dmg)
+          sha256sum "${files[@]}" > SHA256SUMS.txt
+          gh release upload "$RELEASE_TAG" "${files[@]}" SHA256SUMS.txt --repo "$GITHUB_REPOSITORY"
+          release_id="$(gh api "repos/$GITHUB_REPOSITORY/releases" --jq ".[] | select(.tag_name == \"$RELEASE_TAG\" and .draft) | .id")"
+          test -n "$release_id"
+          gh api "repos/$GITHUB_REPOSITORY/releases/$release_id/assets" > uploaded.json
+          for asset in "${files[@]}" SHA256SUMS.txt; do
+            digest="$(sha256sum "$asset" | cut -d ' ' -f 1)"
+            jq -e --arg asset "$asset" --arg digest "sha256:$digest" 'any(.[]; .name == $asset and .state == "uploaded" and .digest == $digest)' uploaded.json
+          done

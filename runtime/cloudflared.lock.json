@@ -1,0 +1,14 @@
+{
+  "win32-x64": {
+    "url": "https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/cloudflared-windows-amd64.exe",
+    "sha256": "2493dbc168923bb3e59e5e7716f71deced92992eea9acd6e9d74f84ac7751343"
+  },
+  "darwin-arm64": {
+    "url": "https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/cloudflared-darwin-arm64.tgz",
+    "sha256": "3586ccf397e98e5f437e60e7c307ca6ac463e110580503af8bb8e6f9ebf831bd"
+  },
+  "darwin-x64": {
+    "url": "https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/cloudflared-darwin-amd64.tgz",
+    "sha256": "02f3edfd87684dd5b705607688e4eb4b323f6e777b81e7b3a85af556aa356848"
+  }
+}

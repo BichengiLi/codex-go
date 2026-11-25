@@ -212,10 +212,25 @@ final class RuntimeInstaller {
   }
 
   static void remove(Path target) throws IOException {
+    try {
+      removeTree(target);
+    } catch (IOException failure) {
+      throw new IOException("无法清理手机运行环境，项目和会话已保留。请重试。", failure);
+    }
+  }
+
+  private static void removeTree(Path target) throws IOException {
     if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) return;
     if (Files.isDirectory(target, LinkOption.NOFOLLOW_LINKS)) {
+      // PRoot creates mode-000 bind placeholders. They survive a runtime rename,
+      // so restore owner access before enumerating an obsolete environment.
+      File directory = target.toFile();
+      if (!directory.setReadable(true, true)
+          || !directory.setWritable(true, true)
+          || !directory.setExecutable(true, true))
+        throw new IOException("无法恢复运行环境目录权限。");
       try (var children = Files.newDirectoryStream(target)) {
-        for (Path child : children) remove(child);
+        for (Path child : children) removeTree(child);
       }
     }
     Files.delete(target);

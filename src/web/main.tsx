@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { api, ApiError, requestId } from "./api";
+import { api, ApiError, requestId, uploadAttachments } from "./api";
+import { maxAttachments, type Attachment } from "../shared/types";
 import { eventStream } from "./native";
+import { activityLabel, replayTurns, updateTurns } from "../shared/live";
 import type {
   Approval,
   HostEvent,
@@ -78,6 +80,8 @@ type Snapshot = {
   active: boolean;
   approvals: Approval[];
   permissions: EffectivePermissions | null;
+  eventSeq?: number;
+  eventEpoch?: string;
 };
 
 function App() {
@@ -91,6 +95,10 @@ function App() {
   const [selected, setSelected] = useState("");
   const [snapshot, setSnapshot] = useState<Snapshot>();
   const [draft, setDraft] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const uploadLock = useRef(false);
   const [busy, setBusy] = useState(false);
   const [network, setNetwork] = useState("connecting");
   const [error, setError] = useState("");
@@ -118,9 +126,13 @@ function App() {
   const readGeneration = useRef(0);
   const listGeneration = useRef(0);
   const bottom = useRef<HTMLDivElement>(null);
+  const followOutput = useRef(true);
+  const eventJournal = useRef<HostEvent[]>([]);
+  const eventEpoch = useRef("");
   const pendingSubmission = useRef<{
     threadId: string;
     text: string;
+    attachments: string[];
     id: string;
   } | null>(null);
 
@@ -174,22 +186,42 @@ function App() {
         generation !== readGeneration.current
       )
         return;
-      setSnapshot((old) =>
-        older && old
-          ? {
-              ...result,
-              thread: {
-                ...result.thread,
-                turns: [
-                  ...result.thread.turns,
-                  ...old.thread.turns.filter(
-                    (t) => !result.thread.turns.some((n) => n.id === t.id),
-                  ),
-                ],
-              },
-            }
-          : result,
-      );
+      setSnapshot((old) => {
+        if (older && old)
+          return {
+            ...old,
+            nextCursor: result.nextCursor,
+            thread: {
+              ...old.thread,
+              turns: [
+                ...result.thread.turns,
+                ...old.thread.turns.filter(
+                  (t) => !result.thread.turns.some((n) => n.id === t.id),
+                ),
+              ],
+            },
+          };
+        const recent = eventJournal.current.filter(
+          (event) => event.params.threadId === threadId,
+        );
+        const after =
+          result.eventEpoch === eventEpoch.current
+            ? (result.eventSeq ?? Number.MAX_SAFE_INTEGER)
+            : Number.MAX_SAFE_INTEGER;
+        const turns = replayTurns(result.thread.turns, recent, after);
+        return {
+          ...result,
+          active: recent.some(
+            (event) =>
+              event.seq > after &&
+              (event.method === "turn/started" ||
+                event.method === "turn/completed"),
+          )
+            ? turns.some((turn) => turn.status === "inProgress")
+            : result.active,
+          thread: { ...result.thread, turns },
+        };
+      });
     },
     [],
   );
@@ -219,11 +251,13 @@ function App() {
   useEffect(() => {
     setSnapshot(undefined);
     setDraft("");
+    setAttachments([]);
+    followOutput.current = true;
     if (selected) loadThread(selected).catch(report);
   }, [selected, loadThread, report]);
   useEffect(() => {
-    bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [snapshot?.thread.turns.length, selected]);
+    if (followOutput.current) bottom.current?.scrollIntoView({ block: "end" });
+  }, [snapshot, selected]);
   useEffect(() => {
     if (!paired) return;
     let stream: ReturnType<typeof eventStream> | undefined,
@@ -246,6 +280,11 @@ function App() {
       );
       stream.addEventListener("sync", (raw) => {
         const sync = JSON.parse((raw as MessageEvent).data);
+        if (sync.epoch !== eventEpoch.current || sync.gap) {
+          eventJournal.current = [];
+          readGeneration.current++;
+        }
+        eventEpoch.current = sync.epoch;
         epoch = sync.epoch;
         if (sync.gap) {
           after = sync.seq;
@@ -259,6 +298,8 @@ function App() {
         const event: HostEvent = JSON.parse((raw as MessageEvent).data);
         if (event.seq <= after) return;
         after = event.seq;
+        eventJournal.current.push(event);
+        if (eventJournal.current.length > 2000) eventJournal.current.shift();
         if (event.method === "bridge/offline") {
           setNetwork("offline");
           setNotice("Codex 进程已退出。请重启主机服务后核对历史。");
@@ -266,39 +307,22 @@ function App() {
         }
         if (event.params.threadId !== selectedRef.current) return;
         if (
-          event.method === "item/agentMessage/delta" ||
-          event.method === "item/commandExecution/outputDelta"
+          event.method === "turn/started" ||
+          event.method === "turn/completed" ||
+          event.method === "turn/plan/updated" ||
+          event.method.startsWith("item/")
         ) {
           setSnapshot((old) => {
             if (!old) return old;
-            const turns = structuredClone(old.thread.turns);
-            let turn = turns.find((t) => t.id === event.params.turnId);
-            if (!turn) {
-              turn = {
-                id: event.params.turnId,
-                status: "inProgress",
-                items: [],
-              };
-              turns.push(turn);
-            }
-            let item = turn.items.find((i) => i.id === event.params.itemId);
-            if (!item) {
-              item = {
-                id: event.params.itemId,
-                type: event.method.includes("agentMessage")
-                  ? "agentMessage"
-                  : "commandExecution",
-                text: "",
-                aggregatedOutput: "",
-              };
-              turn.items.push(item);
-            }
-            const field = event.method.includes("agentMessage")
-              ? "text"
-              : "aggregatedOutput";
-            item[field] = (item[field] ?? "") + event.params.delta;
-            return { ...old, active: true, thread: { ...old.thread, turns } };
+            const turns = updateTurns(old.thread.turns, event);
+            if (turns === old.thread.turns) return old;
+            return {
+              ...old,
+              active: turns.some((turn) => turn.status === "inProgress"),
+              thread: { ...old.thread, turns },
+            };
           });
+          if (event.method === "turn/completed") refresh();
         } else if (event.method === "bridge/unsupported")
           setNotice("此操作需要暂不支持的交互，主机已返回错误。");
         else refresh();
@@ -331,6 +355,7 @@ function App() {
     !!snapshot?.attached &&
     !active &&
     !busy &&
+    !uploading &&
     network === "online" &&
     !!host?.online;
   async function createThread() {
@@ -345,27 +370,111 @@ function App() {
     });
   }
   async function send() {
-    if (!draft.trim() || !canSend) return;
+    if (
+      (!draft.trim() && !attachments.length) ||
+      !canSend ||
+      uploadLock.current
+    )
+      return;
     const text = draft;
+    const paths = attachments.map((file) => file.path);
     if (
       !pendingSubmission.current ||
       pendingSubmission.current.threadId !== selected ||
-      pendingSubmission.current.text !== text
+      pendingSubmission.current.text !== text ||
+      JSON.stringify(pendingSubmission.current.attachments) !==
+        JSON.stringify(paths)
     )
-      pendingSubmission.current = { threadId: selected, text, id: requestId() };
-    const submissionId = pendingSubmission.current.id;
-    await work(async () => {
-      await api(`/threads/${selected}/turns`, "POST", {
+      pendingSubmission.current = {
+        threadId: selected,
         text,
-        requestId: submissionId,
-      });
+        attachments: paths,
+        id: requestId(),
+      };
+    const submissionId = pendingSubmission.current.id;
+    followOutput.current = true;
+    await work(async () => {
+      const result = await api<{ turn: Turn }>(
+        `/threads/${selected}/turns`,
+        "POST",
+        {
+          text,
+          attachments: paths,
+          requestId: submissionId,
+        },
+      );
       pendingSubmission.current = null;
       setDraft("");
+      setAttachments([]);
+      setSnapshot((old) => {
+        if (!old || old.thread.id !== selected) return old;
+        const turns = old.thread.turns.some(
+          (turn) => turn.id === result.turn.id,
+        )
+          ? old.thread.turns
+          : [...old.thread.turns, result.turn];
+        return {
+          ...old,
+          active: turns.some((turn) => turn.status === "inProgress"),
+          thread: { ...old.thread, turns },
+        };
+      });
       await loadThread(selected);
     });
   }
+  async function addAttachments(files?: FileList) {
+    if (!canSend || uploadLock.current || attachments.length >= maxAttachments)
+      return;
+    const threadId = selected;
+    uploadLock.current = true;
+    setUploading(true);
+    setError("");
+    try {
+      const result = await uploadAttachments(
+        threadId,
+        maxAttachments - attachments.length,
+        files,
+      );
+      if (selectedRef.current === threadId) {
+        setAttachments((old) => [...old, ...result.files]);
+        if (result.error) setError(result.error);
+      }
+    } catch (error) {
+      report(error);
+    } finally {
+      uploadLock.current = false;
+      setUploading(false);
+    }
+  }
 
-  if (paired !== true)
+  if (paired === undefined || (window.CodexNative && paired !== true))
+    return (
+      <main className="connection-page" aria-live="polite">
+        <span className="eyebrow">CODEX GO</span>
+        <h2>{paired === undefined ? "正在连接工作空间…" : "需要重新连接"}</h2>
+        <p className="muted">
+          {error ||
+            (paired === undefined
+              ? "正在验证已保存的连接，请稍候。"
+              : "此设备的连接凭据已失效，请返回首页重新连接。")}
+        </p>
+        <button
+          className="primary"
+          disabled={busy}
+          onClick={() =>
+            work(async () => {
+              await loadHost();
+            })
+          }
+        >
+          {busy ? "正在连接…" : "重试连接"}
+        </button>
+        {window.CodexNative && (
+          <button onClick={() => window.CodexNative!.home()}>返回首页</button>
+        )}
+      </main>
+    );
+  if (paired === false)
     return (
       <div className="pair-page">
         <div className="pair-art">
@@ -470,7 +579,6 @@ function App() {
             <Icon name="code" size={22} />
           </span>
           Codex <span>Go</span>
-
         </a>
         <button
           className="host-card"
@@ -749,7 +857,18 @@ function App() {
                 {permissionLabel(snapshot?.permissions)}
               </button>
             </div>
-            <div className="messages" aria-live="polite">
+            <div
+              className="messages"
+              aria-live="polite"
+              onScroll={(event) => {
+                const element = event.currentTarget;
+                followOutput.current =
+                  element.scrollHeight -
+                    element.scrollTop -
+                    element.clientHeight <
+                  100;
+              }}
+            >
               {snapshot?.nextCursor && (
                 <button
                   className="history-more"
@@ -762,7 +881,7 @@ function App() {
                 </button>
               )}
               {!snapshot && <p className="muted loading">正在读取会话…</p>}
-              {snapshot && !currentThread?.turns.length && (
+              {snapshot && !currentThread?.turns.length && !active && (
                 <div className="empty-chat">
                   <Icon name="code" size={32} />
                   <h3>说说你想做什么</h3>
@@ -789,6 +908,16 @@ function App() {
                   )}
                 </div>
               ))}
+              {(active || busy) && (
+                <div className="agent-activity" role="status">
+                  <span className="activity-dot" />
+                  {snapshot?.approvals.length
+                    ? "等待你的审批"
+                    : active
+                      ? activityLabel(activeTurn)
+                      : "正在提交任务…"}
+                </div>
+              )}
               <div ref={bottom} />
             </div>
             {!!snapshot?.approvals.length && (
@@ -867,6 +996,49 @@ function App() {
                 }}
               >
                 <div className="composer">
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    multiple
+                    hidden
+                    aria-label="选择文件、图片或音频"
+                    onChange={(event) => {
+                      if (event.target.files?.length)
+                        void addAttachments(event.target.files);
+                      event.target.value = "";
+                    }}
+                  />
+                  {!!attachments.length && (
+                    <ul className="attachments" aria-label="待发送附件">
+                      {attachments.map((file) => (
+                        <li key={file.path}>
+                          <span title={file.name}>
+                            {file.kind === "image"
+                              ? "图片"
+                              : file.kind === "audio"
+                                ? "音频"
+                                : "文件"}{" "}
+                            · {file.name}
+                          </span>
+                          <small>
+                            {Math.max(1, Math.ceil(file.size / 1024))} KB
+                          </small>
+                          <button
+                            type="button"
+                            aria-label={`移除 ${file.name}`}
+                            disabled={busy || uploading}
+                            onClick={() =>
+                              setAttachments((old) =>
+                                old.filter((item) => item.path !== file.path),
+                              )
+                            }
+                          >
+                            <Icon name="close" size={14} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   <textarea
                     aria-label="开发指令"
                     placeholder="描述需求，或者继续你的想法…"
@@ -882,10 +1054,27 @@ function App() {
                     }}
                   />
                   <div className="composer-tools">
-                    <span>
-                      <Icon name="folder" size={14} />
-                      {currentProject?.name}
-                    </span>
+                    <div className="attachment-tools">
+                      <button
+                        type="button"
+                        className="attach-button"
+                        disabled={
+                          !canSend || attachments.length >= maxAttachments
+                        }
+                        onClick={() =>
+                          window.CodexNative
+                            ? void addAttachments()
+                            : fileInput.current?.click()
+                        }
+                      >
+                        <Icon name="plus" size={16} /> 添加附件
+                      </button>
+                      <span role="status">
+                        {uploading
+                          ? "正在选择或上传…"
+                          : `${attachments.length}/${maxAttachments} · 每个最多 200 MB`}
+                      </span>
+                    </div>
                     {active ? (
                       <button
                         className="stop-button"
@@ -909,7 +1098,9 @@ function App() {
                       <button
                         className="send-button"
                         aria-label="发送指令"
-                        disabled={!canSend || !draft.trim()}
+                        disabled={
+                          !canSend || (!draft.trim() && !attachments.length)
+                        }
                       >
                         <Icon name="arrow" size={19} />
                       </button>
@@ -1147,7 +1338,7 @@ function Message({
     );
   if (item.type === "commandExecution")
     return (
-      <details className="tool-item">
+      <details className="tool-item" open={item.status === "inProgress"}>
         <summary>
           <Icon name="code" size={15} />
           <span>{item.command || "执行命令"}</span>
@@ -1193,7 +1384,45 @@ function Message({
         <div className="prose">{item.text}</div>
       </div>
     );
-  if (item.type === "reasoning") return null;
+  if (item.type === "taskPlan")
+    return (
+      <div className="plan task-plan">
+        <span className="eyebrow">任务计划</span>
+        {item.explanation && <p>{item.explanation}</p>}
+        <ol>
+          {item.plan?.map((step: any, index: number) => (
+            <li key={index} data-status={step.status}>
+              <span>
+                {step.status === "completed"
+                  ? "✓"
+                  : step.status === "inProgress"
+                    ? "●"
+                    : "○"}
+              </span>{" "}
+              {step.step}
+            </li>
+          ))}
+        </ol>
+      </div>
+    );
+  if (item.type === "reasoning")
+    return (
+      <details
+        className="tool-item reasoning"
+        open={item.status === "inProgress"}
+      >
+        <summary>
+          <span>思考摘要</span>
+          <small>{item.status === "inProgress" ? "思考中" : "已完成"}</small>
+        </summary>
+        <div className="prose">
+          {item.summary?.filter(Boolean).join("\n\n") ||
+            (item.status === "inProgress"
+              ? "正在等待模型提供摘要…"
+              : "本轮模型未提供摘要。")}
+        </div>
+      </details>
+    );
   return (
     <details className="tool-item">
       <summary>

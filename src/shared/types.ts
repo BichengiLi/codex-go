@@ -20,6 +20,14 @@ export type Thread = {
   status: { type: string };
   turns: Turn[];
 };
+export type Attachment = {
+  path: string;
+  name: string;
+  size: number;
+  kind: "image" | "audio" | "file";
+};
+export const maxUploadBytes = 200 * 1024 * 1024;
+export const maxAttachments = 8;
 export type Project = {
   id: string;
   name: string;
