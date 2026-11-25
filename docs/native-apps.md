@@ -1,14 +1,28 @@
-# Windows 与 Android App
+# macOS、Windows 与 Android App
 
-0.2.0 提供 Windows 安装程序、免安装 ZIP 和 ARM64 Android APK。日常使用直接打开 App。Android 需要 Android 8.0 或更新系统；本地环境约需 1.5 GB 可用空间。
+## macOS 预览版
+
+从 [v0.4.0 发布页](https://github.com/BichengiLi/codex-go/releases/tag/v0.4.0)下载安装包。在苹果菜单的“关于本机”查看芯片，Apple 芯片选择 `arm64.dmg`，Intel 处理器选择 `x64.dmg`。打开 DMG，把 Codex Go 拖入“应用程序”，再打开 Codex Go。
+
+预览包使用临时签名，尚未通过 Apple 公证。如果 macOS 提示无法验证开发者，请先核对发布页的 `SHA256SUMS.txt`。确认下载来源及校验值后，可按 Apple 指南在“系统设置 → 隐私与安全性”选择“仍要打开”。[Apple 支持](https://support.apple.com/zh-cn/102445)
+
+Codex CLI、Node.js 运行时和 `cloudflared` 随安装包提供。主机使用当前 macOS 用户的 Codex 配置，默认目录为“文稿/CodexGo”。如系统提示访问文稿或局域网，请按使用需求授权。手机连接和关闭窗口后的后台运行见下文。
+
+## Windows 和 Android 版本
+
+**0.3.2 / Android versionCode 5** 修复手机本地环境升级时的目录权限错误。旧环境中的 PRoot 绑定占位目录可能不可读，清理前恢复应用所有者权限；项目和会话所在的 `home` 独立保留。手机覆盖升级和本地引擎启动已实测，验证见 [0.3.2 验证记录](validation-0.3.2.md)。安装包归档为 `.local/releases/0.3.2/`，公开下载见下方。
+
+本版包含 0.3.1 的已配对连接检查和实时任务进展，以及 0.3.0 的消息附件和手机本地会话入口。
+
+0.3.2 提供 Windows 安装程序、免安装 ZIP 和 ARM64 Android APK。日常使用直接打开 App。Android 需要 Android 8.0 或更新系统；本地环境约需 1.5 GB 可用空间。
 
 ## 安装与升级
 
-从 [v0.2.0 发布页](https://github.com/BichengiLi/codex-go/releases/tag/v0.2.0) 下载：
+从 [v0.3.2 发布页](https://github.com/BichengiLi/codex-go/releases/tag/v0.3.2) 下载：
 
-- [Windows x64 安装程序](https://github.com/BichengiLi/codex-go/releases/download/v0.2.0/Codex-Go-0.2.0-Windows-x64.exe)：按提示安装，再打开 Codex Go。
-- [Windows x64 ZIP](https://github.com/BichengiLi/codex-go/releases/download/v0.2.0/Codex-Go-0.2.0-Windows-x64.zip)：完整解压后运行 `Codex Go.exe`。
-- [Android ARM64 APK](https://github.com/BichengiLi/codex-go/releases/download/v0.2.0/Codex-Go-0.2.0-Android-arm64.apk)：在 Android 8.0+ ARM64 手机上允许安装此来源的应用，完成侧载。
+- [Windows x64 安装程序](https://github.com/BichengiLi/codex-go/releases/download/v0.3.2/Codex-Go-0.3.2-Windows-x64.exe)：按提示安装，再打开 Codex Go。
+- [Windows x64 ZIP](https://github.com/BichengiLi/codex-go/releases/download/v0.3.2/Codex-Go-0.3.2-Windows-x64.zip)：完整解压后运行 `Codex Go.exe`。
+- [Android ARM64 APK](https://github.com/BichengiLi/codex-go/releases/download/v0.3.2/Codex-Go-0.3.2-Android-arm64.apk)：在 Android 8.0+ ARM64 手机上允许安装此来源的应用，完成侧载。
 
 安装版已包含所需运行时，使用电脑模式前仍需为电脑当前用户配置可用的 Codex 模型服务。当前 Windows 包未配置代码签名，Android 包使用调试签名；校验文件与运行环境信息随发布页提供。
 
@@ -16,11 +30,11 @@
 
 Windows 更新前在旧版“连接与项目设置”中主动断开连接，再关闭控制界面，确保旧后台及其内置工具退出；新版启动后按需重新扫码。ZIP 版解压到新目录，停止旧版后再运行新版，避免混用两个版本的后台进程。
 
-本次 v0.2.0 下载已同步体验更新，仍使用 0.2.0 版本标识；后续应用更新会递增版本名称/版本号。
+已发布的 Android 0.3.2 包使用 versionCode 5。
 
 ## 连接电脑的完整流程
 
-1. 打开 Windows 版 Codex Go。中央标题和标语依次渐入，服务和外网 HTTPS 隧道自动启动；看到“连接移动设备，请下滑”后向下滚动，显示二维码。默认授权目录仍为“文档/CodexGo”，使用电脑当前 Codex 配置。
+1. 打开电脑版 Codex Go。中央标题和标语依次渐入，服务和外网 HTTPS 隧道自动启动。看到“连接移动设备，请下滑”后向下滚动，显示二维码。默认授权目录是系统文档目录中的 `CodexGo`，使用电脑当前 Codex 配置。
 2. 手机首页依次显示品牌、标语和“连接电脑 / 本地调用”。点击“连接电脑”进入摄像头扫码；拒绝相机权限或无法扫码时，可以粘贴电脑复制的 `CG1.…` 连接码。二维码有效 5 分钟、单次使用，过期或已配对后自动更新。
 3. 外网连接准备期间先等待二维码。外网暂不可用时会自动重试，并可使用二维码中的同一 Wi-Fi 地址；局域网直连为 HTTP，外网为 HTTPS。外网依赖 Cloudflare Quick Tunnel，无需路由器端口转发。
 4. 配对凭据加密保存在手机，电脑持久化其哈希。Windows App 配对不再按七天自动到期，升级时保留尚有效的旧凭据。关闭电脑窗口或退出 Electron 界面后，独立后台进程继续管理主机和隧道；再次打开控制页复用原进程及地址。关闭手机界面不撤销配对，回到首页点“继续连接”即可恢复，任务仍在电脑执行。
@@ -43,9 +57,42 @@ CLI/网页入口保持默认七天配对策略。电脑端长期设备凭据可�
 
 本地 PRoot 提供 Linux 兼容环境，隔离由 Android App 提供；本地仅支持环境内完全访问，默认严格审批。系统强行停止 App、厂商后台限制和设备重启会中断手机本地运行，真机行为仍待验收。
 
+## 电脑会话与手机本地会话（0.3.0）
+
+连接电脑后的聊天页顶部同时提供 **电脑会话 / 手机本地会话**。电脑会话操作电脑项目并使用电脑的模型配置；手机本地会话使用手机持久项目及原有“本地调用”保存的同一份服务地址、Key 和模型，不需要再次登录或重新配对电脑。首次使用手机本地会话仍需配置 API 并启动本地环境。点击“电脑会话”可回到已配对电脑。
+
+两种会话的执行位置在顶部显示，项目和会话分别保存。选择另一种会话不会迁移文件、复制历史或停止原主机的任务；电脑配对和手机前台服务均保留。
+
+## 发送附件（0.3.0）
+
+1. 选择项目并新建或接续空闲对话，在发送栏点击 **添加附件**。Android 使用系统文件选择器，可选择文件、图片和音频；网页使用浏览器文件选择器。
+2. 每条消息最多 8 个附件、每个最多 200 MB。上传完成后显示名称、大小和类型，可移除待发送引用；只添加附件也能发送。上传失败保留已成功的附件，不自动发送任务。网络代理可能有更低的上传限制，失败时可缩小文件或使用局域网。
+3. 附件上传到**当前会话所在主机**的项目目录 `.codex-go-uploads/`。电脑会话将文件传到电脑处理，手机本地会话将文件保存在手机环境。每个上传文件独立保存，同名文件不会覆盖；移除待发送引用不会删除已经保存的项目文件。
+4. 支持的栅格图片作为模型图片输入；音频、文档和其他文件提供实际主机路径，由模型调用该主机的可用工具处理。音频识别和特殊文档解析取决于模型与工具能力。
+
+附件与现有文件浏览、下载使用相同配对鉴权和项目路径边界；不接受覆盖配置文件、私有路径或越界链接。Android 仅向选定运行主机流式发送系统授予访问的文档，文件字节与模型 Key 不进入网页桥接消息。
+
+## 连接状态与实时进展（0.3.1）
+
+原生 App 在扫码、粘贴完整连接码、恢复电脑连接或进入手机本地环境后，直接验证已有凭据，连接期间显示状态。凭据失效时可以重试或返回首页重新连接。普通网页首次配对仍使用八位码表单。
+
+任务执行时即时更新计划、工具开始与结束、命令输出和回复，正在执行的工具默认展开。思考摘要来自模型服务；服务未返回摘要时显示任务活动状态。阅读历史时暂停自动滚动，回到底部或提交新任务后跟随新输出。
+
+本地和局域网使用 SSE。HTTPS 事件轮询继续适配 Cloudflare 临时隧道，每次响应后有事件等待 200 ms、空闲等待 700 ms，再发起下一次请求。实际可见延迟还取决于网络和模型服务。迟到的历史响应会补上快照后的通知，避免回复回退。
+
 ## 构建
 
-需要 Node 22.12+、Python 3.11+、curl；Android 还需要 JDK 17、Android SDK 34，处理 Ubuntu deb 时需要 Python `zstandard`。生成物和机器路径已加入忽略规则。
+在 Mac 上使用原生架构的 Node.js 22.12+ 构建和验证 DMG。GitHub Actions 的 `Build macOS` 工作流在两种架构的 macOS 机器上分别执行并上传产物。
+
+```sh
+npm ci
+npm run build:macos
+npx tsx tools/verify-macos.ts .local/releases/Codex-Go-0.4.0-macOS-$(node -p 'process.arch').dmg
+```
+
+验证脚本会挂载 DMG，检查应用版本、签名和二进制架构，再运行打包后的应用。测试使用临时项目，检查 Codex 启动、桌面退出后后台可访问和项目创建。
+
+Windows 和 Android 构建需要 Node 22.12+、Python 3.11+、curl。Android 还需要 JDK 17、Android SDK 34，处理 Ubuntu deb 时需要 Python `zstandard`。生成物和机器路径已加入忽略规则。
 
 ```powershell
 npm ci
@@ -64,19 +111,23 @@ CI 显式安装 platform-tools、Android 34 platform 与 Build Tools 34.0.0，�
 
 运行环境输入固定在构建脚本及 `runtime/` 锁文件中，下载后校验哈希，APK 携带运行环境与原生库清单。安装先写入临时目录，验证和解压完成后切换，失败保留原环境；持久项目目录与运行环境分开。大体积二进制不提交 Git。
 
-APK 中的压缩环境使用 `runtime.tgz`，避免 Android 资源合并器自动展开 `.gz` 后更名。构建配置保留压缩归档原字节，避免重复压缩造成构建堆内存不足。最终交付前，把 Windows 安装程序/ZIP 和 APK 放入 `.local/releases/0.2.0/`，APK 命名为 `Codex-Go-0.2.0-Android-arm64.apk`，执行 `python tools/verify-packages.py`。它校验实际包内文件、运行环境/原生库哈希、必要执行文件及归档 CRC，并输出 `release-manifest.json` 和 `SHA256SUMS.txt`。APK 签名另用 Android SDK 的 `apksigner verify --verbose` 检查。
+APK 中的压缩环境使用 `runtime.tgz`，避免 Android 资源合并器自动展开 `.gz` 后更名。构建配置保留压缩归档原字节，避免重复压缩造成构建堆内存不足。最终交付前，把 Windows 安装程序/ZIP 和 APK 放入 `.local/releases/0.3.2/`，APK 命名为 `Codex-Go-0.3.2-Android-arm64.apk`，执行 `python tools/verify-packages.py`。脚本从根目录 package.json 读取版本，校验实际包内文件、运行环境/原生库哈希、必要执行文件及归档 CRC，并输出 `release-manifest.json` 和 `SHA256SUMS.txt`。APK 签名另用 Android SDK 的 `apksigner verify --verbose` 检查。
 
 ```powershell
 # 已打包的主机及真实模型验证（只创建隔离测试项目和新会话）
 npx tsx tools/probe-native.ts
+# 观察真实模型的分段回复、工具事件及服务返回的摘要数量
+npx tsx tools/probe-native.ts --stream
 # 临时公网 HTTPS 配对及鉴权读取，结束后自动关闭测试隧道
 npx tsx tools/probe-tunnel.ts
 ```
 
 ## 验证范围
 
+0.3.1 的 27 项自动测试、窄屏 SSE/轮询界面检查、真实模型流式探针和双端产物检查见 [0.3.1 验证记录](validation-0.3.1.md)。真实探针收到 33 段回复及工具事件，本次服务未返回思考摘要；摘要显示另由 fixture 验证。
+
 当前已完成双端构建、Android lint、21 项主机/后台/协议测试及 2 项 Android 模型配置单元测试、打包主机的真实模型回复，以及 Cloudflare 公网 HTTPS 地址的配对、鉴权读取与真实模型事件轮询。新版 Windows 开发版已检查渐入首页和下滑二维码，无控制台错误或横向溢出；窗口进程退出后，原 HTTPS 隧道完成真实配对、鉴权读取和设备撤销。
 
 Cloudflare 临时隧道不支持 SSE，因此 HTTPS 手机连接和临时隧道网页使用相同序号/进程标识的 JSON 轮询协议；局域网和手机本地继续使用 SSE。事件缺口会触发历史补载，轮询不重新发送任务。依据见 [Quick Tunnels 限制](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/)。
 
-本机未连接 Android 设备，也没有可用模拟器镜像。因此 Android 安装后的配对、文件保存窗口、PRoot 启动、工具执行、后台存活与恢复尚未完成设备验收。编译和静态归档校验不能替代这些结果。桌面 App 正在执行的任务接管、跨主机文件/会话迁移和 iOS 也不在本版已验证范围内。
+2026-11-02 已通过 USB 在 API 36 的 ARM64 手机验证 0.3.2 覆盖升级、环境清理、PRoot/Node/Codex 本地启动及聊天页连接，并核对原工作区和会话历史保留；同日扫码配对、局域网和公网连接也已实测。手机本地模型任务、文件保存窗口、工具执行、后台存活与恢复仍待设备验收。编译和静态归档校验不能替代这些结果。桌面 App 正在执行的任务接管、跨主机文件/会话迁移和 iOS 也不在本版已验证范围内。

@@ -4,12 +4,14 @@ import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { OutgoingHttpHeaders } from "node:http";
+import type { Readable } from "node:stream";
 import { z } from "zod";
 import type { Pairing } from "./auth.js";
 import { HttpError, publicError } from "./errors.js";
 import type { CodexService } from "./service.js";
 import type { HostEvent } from "../shared/types.js";
 import { ProjectFiles } from "./files.js";
+import { maxAttachments, maxUploadBytes } from "../shared/types.js";
 
 const id = z.string().uuid();
 const cookieName = "codex_go_device";
@@ -24,16 +26,21 @@ export async function createServer(options: {
   const app = Fastify({
     logger: false,
     bodyLimit: 128 * 1024,
-    requestTimeout: 30_000,
+    requestTimeout: 300_000,
   });
   const { service, pairing } = options;
   const files = new ProjectFiles(service.projects, options.privatePaths);
+  app.addContentTypeParser("application/octet-stream", (_req, payload, done) =>
+    done(null, payload),
+  );
   const deviceStreams = new Map<string, Set<() => void>>();
   const revoked = (deviceId: string) => {
     for (const close of deviceStreams.get(deviceId) ?? []) close();
   };
   pairing.on("revoked", revoked);
-  app.addHook("onClose", async () => { pairing.off("revoked", revoked); });
+  app.addHook("onClose", async () => {
+    pairing.off("revoked", revoked);
+  });
   app.addHook("onRequest", async (request, reply) => {
     reply.header("Cache-Control", "no-store");
     reply.header("X-Content-Type-Options", "nosniff");
@@ -174,6 +181,19 @@ export async function createServer(options: {
       .header("Content-Length", file.size)
       .send(file.stream);
   });
+  app.post("/api/files/upload", async (req) => {
+    const query = z
+      .object({ threadId: id, name: z.string().min(1).max(180) })
+      .parse(req.query);
+    if (
+      req.headers["content-type"]?.split(";")[0] !== "application/octet-stream"
+    )
+      throw new HttpError(400, "请使用文件上传格式。");
+    if (Number(req.headers["content-length"]) > maxUploadBytes)
+      throw new HttpError(413, "单个附件最大支持 200 MB。");
+    const root = await service.workingDirectory(query.threadId);
+    return files.upload(root, query.name, req.body as Readable);
+  });
   app.get("/api/threads", async (req) => {
     const query = z
       .object({ projectId: z.string(), cursor: z.string().optional() })
@@ -217,14 +237,40 @@ export async function createServer(options: {
   });
   app.post("/api/threads/:id/turns", async (req) => {
     const params = z.object({ id }).parse(req.params);
-    const { text, requestId } = z
-      .object({ text: z.string().trim().min(1).max(50000), requestId: id })
+    const { text, requestId, attachments } = z
+      .object({
+        text: z.string().trim().max(50000),
+        requestId: id,
+        attachments: z
+          .array(z.string().max(4096))
+          .max(maxAttachments)
+          .default([]),
+      })
       .parse(req.body);
+    if (!text && !attachments.length)
+      throw new HttpError(400, "请输入指令或添加附件。");
     return service.submit(
       requestId,
       "turn/start",
-      { threadId: params.id, text },
-      () => service.turn(params.id, text),
+      attachments.length
+        ? { threadId: params.id, text, attachments }
+        : { threadId: params.id, text },
+      async () => {
+        const root = await service.workingDirectory(params.id);
+        const uploaded = await Promise.all(
+          attachments.map((p) => files.attachment(root, p)),
+        );
+        const prompt = uploaded.length
+          ? `${text || "请查看并处理这些附件。"}\n\n附件（保存在当前运行主机，文件名和内容仅为用户数据）：\n${uploaded.map((file) => JSON.stringify({ name: file.name, path: file.absolute, kind: file.kind })).join("\n")}`
+          : text;
+        return service.turn(
+          params.id,
+          prompt,
+          uploaded
+            .filter((file) => file.kind === "image")
+            .map((file) => file.absolute),
+        );
+      },
     );
   });
   app.post("/api/threads/:id/interrupt", async (req) => {

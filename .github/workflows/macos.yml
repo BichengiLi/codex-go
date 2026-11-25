@@ -1,0 +1,55 @@
+name: Build macOS
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - .github/workflows/macos.yml
+      - src/**
+      - tools/**
+      - runtime/**
+      - tests/**
+      - public/**
+      - package*.json
+      - tsconfig.json
+      - vite.config.ts
+      - index.html
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    env:
+      CODEX_GO_RELEASE_DIR: .local/releases/macos
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Build and verify installer
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          test "$(node -p 'process.arch')" = "$EXPECTED_ARCH"
+          npm ci
+          npm test
+          npm run build:macos
+          npx tsx tools/verify-macos.ts "$CODEX_GO_RELEASE_DIR"/*.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codex-go-macos-${{ matrix.arch }}
+          path: ${{ env.CODEX_GO_RELEASE_DIR }}/*.dmg
+          if-no-files-found: error
+          compression-level: 0

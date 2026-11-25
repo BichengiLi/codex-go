@@ -12,14 +12,16 @@
 
 ## 功能
 
-- **扫码连接电脑**：Windows 启动后自动开启 HTTPS 外网连接，下滑显示二维码，手机扫码配对。
+- **扫码连接电脑**：在 Windows 或 Mac 上打开 Codex Go，下滑显示二维码，手机扫码配对。电脑默认尝试开启 HTTPS 外网连接。
 - **关闭窗口后继续运行**：电脑后台独立运行，关闭控制界面或手机界面会保留配对；可主动断联或撤销设备。
 - **手机本地开发**：Android 内置 ARM64 Linux、Node.js、Git 和官方 Codex CLI，不需要电脑保持在线。
 - **自带模型服务**：填写服务地址和 API Key，获取可用模型、多选并设置当前模型；服务需兼容 Responses 与工具调用。
 - **项目与会话**：选择授权目录、导入 Codex App 已保存的项目、创建空项目、新建或接续空闲会话。
 - **任务与文件**：查看输出和文件改动、处理执行审批、调整会话权限、停止任务、下载生成文件。
+- **消息附件**：发送文件、图片和音频到当前会话的运行主机；连接电脑后可直接选择电脑会话或手机本地会话，手机继续使用同一份 API 配置。见[附件验证范围](docs/validation-2026-11-01.md)。
+- **连接与实时进展**：手机已配对后直接验证连接，显示服务提供的思考摘要、任务计划、工具输出和逐段回复。见 [0.3.1 验证记录](docs/validation-0.3.1.md)。
 
-当前为 **0.2.0 预发布版**。Windows 界面、后台连接和公网配对已验证；Android 已完成构建、单元测试和静态检查，扫码、本地执行及后台恢复仍待真机验收。详见[验证范围](docs/native-apps.md#验证范围)。
+[**0.4.0 macOS 预览版**](https://github.com/BichengiLi/codex-go/releases/tag/v0.4.0)提供 Apple 芯片和 Intel 安装包。Windows 和 Android 安装包从 [0.3.2 发布页](https://github.com/BichengiLi/codex-go/releases/tag/v0.3.2)下载，设备测试见[验证范围](docs/native-apps.md#验证范围)。
 
 ## 下载与安装
 
@@ -27,16 +29,18 @@
 
 | 平台 | 下载 | 安装方法 |
 | --- | --- | --- |
-| Windows x64 安装版 | [Codex-Go-0.2.0-Windows-x64.exe](https://github.com/BichengiLi/codex-go/releases/download/v0.2.0/Codex-Go-0.2.0-Windows-x64.exe) | 运行安装程序，按提示完成安装 |
-| Windows x64 免安装版 | [Codex-Go-0.2.0-Windows-x64.zip](https://github.com/BichengiLi/codex-go/releases/download/v0.2.0/Codex-Go-0.2.0-Windows-x64.zip) | 完整解压，运行 `Codex Go.exe` |
-| Android ARM64 | [Codex-Go-0.2.0-Android-arm64.apk](https://github.com/BichengiLi/codex-go/releases/download/v0.2.0/Codex-Go-0.2.0-Android-arm64.apk) | Android 8.0+，允许浏览器或文件管理器安装此 APK |
+| Mac（Apple 芯片） | [Codex-Go-0.4.0-macOS-arm64.dmg](https://github.com/BichengiLi/codex-go/releases/download/v0.4.0/Codex-Go-0.4.0-macOS-arm64.dmg) | 打开 DMG，将 Codex Go 拖入“应用程序” |
+| Mac（Intel） | [Codex-Go-0.4.0-macOS-x64.dmg](https://github.com/BichengiLi/codex-go/releases/download/v0.4.0/Codex-Go-0.4.0-macOS-x64.dmg) | 打开 DMG，将 Codex Go 拖入“应用程序” |
+| Windows x64 安装版 | [Codex-Go-0.3.2-Windows-x64.exe](https://github.com/BichengiLi/codex-go/releases/download/v0.3.2/Codex-Go-0.3.2-Windows-x64.exe) | 运行安装程序，按提示完成安装 |
+| Windows x64 免安装版 | [Codex-Go-0.3.2-Windows-x64.zip](https://github.com/BichengiLi/codex-go/releases/download/v0.3.2/Codex-Go-0.3.2-Windows-x64.zip) | 完整解压，运行 `Codex Go.exe` |
+| Android ARM64 | [Codex-Go-0.3.2-Android-arm64.apk](https://github.com/BichengiLi/codex-go/releases/download/v0.3.2/Codex-Go-0.3.2-Android-arm64.apk) | Android 8.0+，允许浏览器或文件管理器安装此 APK |
 
-Android 本地环境建议预留至少 1.5 GB 可用空间。当前 APK 使用调试签名、通过侧载安装；Windows 包尚未配置代码签名。仅从本仓库 Releases 获取安装包。
+Mac 预览包使用临时签名，首次启动可能需要在“系统设置 → 隐私与安全性”中确认，详见 [macOS 安装说明](docs/native-apps.md#macos-预览版)。Android 本地环境建议预留至少 1.5 GB 可用空间。当前 APK 使用调试签名，通过侧载安装。Windows 包尚未配置代码签名。仅从本仓库 Releases 获取安装包。
 
-可使用发布页的 [SHA256SUMS.txt](https://github.com/BichengiLi/codex-go/releases/download/v0.2.0/SHA256SUMS.txt) 核对下载完整性：
+可使用发布页的 [SHA256SUMS.txt](https://github.com/BichengiLi/codex-go/releases/download/v0.3.2/SHA256SUMS.txt) 核对下载完整性：
 
 ```powershell
-Get-FileHash .\Codex-Go-0.2.0-Windows-x64.exe -Algorithm SHA256
+Get-FileHash .\Codex-Go-0.3.2-Windows-x64.exe -Algorithm SHA256
 ```
 
 已有安装通常可以覆盖更新，不必先卸载。**卸载 Android App 或清除数据会删除手机上的项目、会话与 API 配置。** 如果出现签名不一致或安装失败，先保留数据并记录错误，参见[安装与升级](docs/native-apps.md#安装与升级)。
@@ -49,6 +53,10 @@ Get-FileHash .\Codex-Go-0.2.0-Windows-x64.exe -Algorithm SHA256
 2. 手机打开 Codex Go，点击 **连接电脑**，允许相机权限并扫描二维码；也可以粘贴电脑复制的 `CG1.…` 连接码。
 3. 选择项目，创建对话；接续已有对话前，先确认电脑上的该会话已经空闲。
 4. 输入需求，查看输出、处理审批或保存文件。电脑下方的 **连接与项目设置** 可更换授权目录或撤销设备。
+
+手机扫码、粘贴连接码或恢复连接后，聊天页直接验证已保存的凭据；连接失败可重试或返回首页。八位码表单仅供未配对的普通网页首次连接使用。
+
+执行期间会持续显示任务状态、计划、工具输出和分段回复；模型服务返回思考摘要时会同步展示。上滑阅读历史时暂停自动跟随，回到底部后继续跟随输出。
 
 电脑使用当前用户的 Codex 配置，需先配置可用的模型服务。默认项目目录为“文档/CodexGo”；模型 API Key 留在电脑上。二维码五分钟内有效且只能使用一次，配对后保存独立设备凭据。
 
@@ -77,7 +85,7 @@ Get-FileHash .\Codex-Go-0.2.0-Windows-x64.exe -Algorithm SHA256
 
 **支持哪些平台和模型服务？**
 
-提供 Windows x64 和 Android ARM64 安装包。CLI/网页开发入口支持 Windows/Linux；iOS、跨主机项目迁移、仓库克隆和任务补充指令尚未提供。模型服务需兼容所固定 Codex CLI 的 Responses 协议，目前不提供 Chat Completions 转换或离线模型推理。
+提供 macOS（Apple 芯片、Intel）、Windows x64 和 Android ARM64 安装包。iOS、跨主机项目迁移、仓库克隆和任务补充指令尚未提供。模型服务需兼容所固定 Codex CLI 的 Responses 协议，目前不提供 Chat Completions 转换或离线模型推理。
 
 ## 从源码运行
 
@@ -99,7 +107,7 @@ npm test
 npm run build
 ```
 
-原生安装包构建见[构建指南](docs/native-apps.md#构建)。CI 覆盖 Windows/Ubuntu 测试与构建、Android 客户端编译和 lint；完整 ARM64 运行环境需要单独打包。
+原生安装包构建见[构建指南](docs/native-apps.md#构建)。CI 覆盖 Windows/Ubuntu 测试与构建、macOS 安装包验证、Android 客户端编译和 lint。完整 Android ARM64 运行环境需要单独打包。
 
 ## 文档
 

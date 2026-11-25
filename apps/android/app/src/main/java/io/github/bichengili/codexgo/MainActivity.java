@@ -27,6 +27,16 @@ public class MainActivity extends Activity {
   private TextView status;
   private String pendingDownload;
   private HostConnection downloadHost;
+  private PendingUpload pendingUpload;
+  private static final class PendingUpload {
+    final String id, threadId;
+    final int view, remaining;
+    final HostConnection target;
+    PendingUpload(String id, String threadId, int view, int remaining, HostConnection target) {
+      this.id = id; this.threadId = threadId; this.view = view;
+      this.remaining = remaining; this.target = target;
+    }
+  }
   private boolean destroyed = false;
   private int generation = 0;
 
@@ -365,10 +375,28 @@ public class MainActivity extends Activity {
     LinearLayout shell = new LinearLayout(this);
     shell.setOrientation(LinearLayout.VERTICAL);
     shell.setBackgroundColor(0xff0c1012);
-    TextView heading = text("‹ 切换主机    ·    " + selected.name, 14, 0xffc0ec91);
+    TextView heading = text("‹ 首页    ·    当前运行主机：" + selected.name, 14, 0xffc0ec91);
     heading.setPadding(dp(16), dp(9), dp(16), dp(9));
     heading.setOnClickListener(v -> home());
     shell.addView(heading);
+    LinearLayout sessions = new LinearLayout(this);
+    sessions.setPadding(dp(12), 0, dp(12), dp(4));
+    boolean local = selected == EngineService.connection;
+    try {
+      String saved = vault.get("remote");
+      if (!saved.isEmpty()) {
+        HostConnection remote = HostConnection.restore(saved);
+        TextView computer = text((local ? "" : "● ") + "电脑会话", 14, local ? MUTED : ACCENT);
+        computer.setGravity(Gravity.CENTER); computer.setPadding(dp(10), dp(12), dp(10), dp(12));
+        computer.setOnClickListener(v -> { if (local) showHost(remote); });
+        sessions.addView(computer, new LinearLayout.LayoutParams(0, -2, 1));
+      }
+    } catch (Exception ignored) {}
+    TextView phone = text((local ? "● " : "") + "手机本地会话", 14, local ? ACCENT : MUTED);
+    phone.setGravity(Gravity.CENTER); phone.setPadding(dp(10), dp(12), dp(10), dp(12));
+    phone.setOnClickListener(v -> { if (!local) enterLocal(); });
+    sessions.addView(phone, new LinearLayout.LayoutParams(0, -2, 1));
+    shell.addView(sessions);
     if (selected == EngineService.connection) {
       TextView settings = text("模型与 API 设置   ↗", 12, ACCENT);
       settings.setPadding(dp(16), 0, dp(16), dp(10)); settings.setOnClickListener(v -> configureLocal()); shell.addView(settings);
@@ -458,6 +486,7 @@ public class MainActivity extends Activity {
           || !Arrays.asList("GET", "POST", "DELETE").contains(method)
           || body.length() > 128 * 1024
           || path.startsWith("/api/events")
+          || path.startsWith("/api/files/upload")
           || path.startsWith("/api/files/download")) return;
       work.execute(
           () -> {
@@ -555,6 +584,25 @@ public class MainActivity extends Activity {
     }
 
     @JavascriptInterface
+    public void upload(String id, String threadId, int remaining) {
+      if (!id.matches("[0-9]{1,12}") || !threadId.matches("[0-9a-fA-F-]{36}") || remaining < 1 || remaining > 8) return;
+      ui.post(() -> {
+        if (destroyed || generation != view) return;
+        if (pendingUpload != null) { uploadResult(new PendingUpload(id, threadId, view, remaining, target), new JSONArray(), "已有文件选择窗口打开。"); return; }
+        PendingUpload upload = new PendingUpload(id, threadId, view, remaining, target);
+        pendingUpload = upload;
+        Intent choose = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+            .putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        try { startActivityForResult(choose, 8); }
+        catch (Exception e) {
+          pendingUpload = null;
+          uploadResult(upload, new JSONArray(), "无法打开文件选择窗口。");
+        }
+      });
+    }
+
+    @JavascriptInterface
     public void download(String path) {
       if (!path.startsWith("/api/files/download?")) return;
       ui.post(
@@ -598,9 +646,46 @@ public class MainActivity extends Activity {
     }
   }
 
+  private void uploadResult(PendingUpload upload, JSONArray files, String error) {
+    JSONObject response = new JSONObject();
+    try {
+      response.put("files", files);
+      if (error != null) response.put("error", error);
+    } catch (org.json.JSONException ignored) {}
+    script(upload.view, "window.codexGoResult(" + JSONObject.quote(upload.id) + ",200," + JSONObject.quote(response.toString()) + ")");
+  }
+
   @Override
   protected void onActivityResult(int request, int result, Intent data) {
     super.onActivityResult(request, result, data);
+    if (request == 8) {
+      PendingUpload upload = pendingUpload;
+      pendingUpload = null;
+      if (upload == null || upload.view != generation) return;
+      if (result != RESULT_OK || data == null) { uploadResult(upload, new JSONArray(), null); return; }
+      List<Uri> documents = new ArrayList<>();
+      ClipData clip = data.getClipData();
+      if (clip != null) {
+        for (int i = 0; i < clip.getItemCount(); i++) documents.add(clip.getItemAt(i).getUri());
+      } else if (data.getData() != null) documents.add(data.getData());
+      if (documents.size() > upload.remaining) {
+        uploadResult(upload, new JSONArray(), "每条消息最多 8 个附件，本次还可添加 " + upload.remaining + " 个。"); return;
+      }
+      work.execute(() -> {
+        JSONArray files = new JSONArray();
+        String error = null;
+        try {
+          for (Uri document : documents) {
+            if (destroyed || generation != upload.view) break;
+            files.put(AttachmentUpload.send(this, upload.target, upload.threadId, document));
+          }
+        } catch (Exception e) {
+          error = e instanceof IOException ? e.getMessage() : "附件上传失败，请检查文件与连接。";
+        }
+        uploadResult(upload, files, error);
+      });
+      return;
+    }
     if (request == 20) {
       if (result == RESULT_OK && data != null) {
         if (data.getBooleanExtra("manual", false)) manualCode("");
