@@ -9,11 +9,12 @@ const projectDir = path.resolve(`dist/native-macos-${process.arch}`);
 await build({
   projectDir,
   targets: Platform.MAC.createTarget(["dmg"], Arch[process.arch]),
+  publish: "never",
   config: {
     appId: "io.github.bichengili.codexgo",
     productName: "Codex Go",
     electronVersion,
-    electronDist: path.resolve("node_modules/electron/dist"),
+    npmRebuild: false,
     directories: {
       output: path.resolve(process.env.CODEX_GO_RELEASE_DIR ?? ".local/releases"),
     },
@@ -40,6 +41,5 @@ await build({
       },
     },
     dmg: { writeUpdateInfo: false },
-    publish: null,
   },
 });
