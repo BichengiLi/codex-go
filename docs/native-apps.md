@@ -1,4 +1,14 @@
-# Windows 与 Android App
+# macOS、Windows 与 Android App
+
+## macOS 预览版
+
+从 [v0.4.0 发布页](https://github.com/BichengiLi/codex-go/releases/tag/v0.4.0)下载安装包。在苹果菜单的“关于本机”查看芯片，Apple 芯片选择 `arm64.dmg`，Intel 处理器选择 `x64.dmg`。打开 DMG，把 Codex Go 拖入“应用程序”，再打开 Codex Go。
+
+预览包使用临时签名，尚未通过 Apple 公证。如果 macOS 提示无法验证开发者，请先核对发布页的 `SHA256SUMS.txt`。确认下载来源及校验值后，可按 Apple 指南在“系统设置 → 隐私与安全性”选择“仍要打开”。[Apple 支持](https://support.apple.com/zh-cn/102445)
+
+Codex CLI、Node.js 运行时和 `cloudflared` 随安装包提供。主机使用当前 macOS 用户的 Codex 配置，默认目录为“文稿/CodexGo”。如系统提示访问文稿或局域网，请按使用需求授权。手机连接和关闭窗口后的后台运行见下文。
+
+## Windows 和 Android 版本
 
 **0.3.2 / Android versionCode 5** 修复手机本地环境升级时的目录权限错误。旧环境中的 PRoot 绑定占位目录可能不可读，清理前恢复应用所有者权限；项目和会话所在的 `home` 独立保留。手机覆盖升级和本地引擎启动已实测，验证见 [0.3.2 验证记录](validation-0.3.2.md)。安装包归档为 `.local/releases/0.3.2/`，公开下载见下方。
 
@@ -8,7 +18,7 @@
 
 ## 安装与升级
 
-从 [v0.3.1 发布页](https://github.com/BichengiLi/codex-go/releases/tag/v0.3.2) 下载：
+从 [v0.3.2 发布页](https://github.com/BichengiLi/codex-go/releases/tag/v0.3.2) 下载：
 
 - [Windows x64 安装程序](https://github.com/BichengiLi/codex-go/releases/download/v0.3.2/Codex-Go-0.3.2-Windows-x64.exe)：按提示安装，再打开 Codex Go。
 - [Windows x64 ZIP](https://github.com/BichengiLi/codex-go/releases/download/v0.3.2/Codex-Go-0.3.2-Windows-x64.zip)：完整解压后运行 `Codex Go.exe`。
@@ -20,11 +30,11 @@
 
 Windows 更新前在旧版“连接与项目设置”中主动断开连接，再关闭控制界面，确保旧后台及其内置工具退出；新版启动后按需重新扫码。ZIP 版解压到新目录，停止旧版后再运行新版，避免混用两个版本的后台进程。
 
-本次版本为 0.3.2，Android versionCode 5；已发布的历史版本保持不变。
+已发布的 Android 0.3.2 包使用 versionCode 5。
 
 ## 连接电脑的完整流程
 
-1. 打开 Windows 版 Codex Go。中央标题和标语依次渐入，服务和外网 HTTPS 隧道自动启动；看到“连接移动设备，请下滑”后向下滚动，显示二维码。默认授权目录仍为“文档/CodexGo”，使用电脑当前 Codex 配置。
+1. 打开电脑版 Codex Go。中央标题和标语依次渐入，服务和外网 HTTPS 隧道自动启动。看到“连接移动设备，请下滑”后向下滚动，显示二维码。默认授权目录是系统文档目录中的 `CodexGo`，使用电脑当前 Codex 配置。
 2. 手机首页依次显示品牌、标语和“连接电脑 / 本地调用”。点击“连接电脑”进入摄像头扫码；拒绝相机权限或无法扫码时，可以粘贴电脑复制的 `CG1.…` 连接码。二维码有效 5 分钟、单次使用，过期或已配对后自动更新。
 3. 外网连接准备期间先等待二维码。外网暂不可用时会自动重试，并可使用二维码中的同一 Wi-Fi 地址；局域网直连为 HTTP，外网为 HTTPS。外网依赖 Cloudflare Quick Tunnel，无需路由器端口转发。
 4. 配对凭据加密保存在手机，电脑持久化其哈希。Windows App 配对不再按七天自动到期，升级时保留尚有效的旧凭据。关闭电脑窗口或退出 Electron 界面后，独立后台进程继续管理主机和隧道；再次打开控制页复用原进程及地址。关闭手机界面不撤销配对，回到首页点“继续连接”即可恢复，任务仍在电脑执行。
@@ -72,7 +82,17 @@ CLI/网页入口保持默认七天配对策略。电脑端长期设备凭据可�
 
 ## 构建
 
-需要 Node 22.12+、Python 3.11+、curl；Android 还需要 JDK 17、Android SDK 34，处理 Ubuntu deb 时需要 Python `zstandard`。生成物和机器路径已加入忽略规则。
+在 Mac 上使用原生架构的 Node.js 22.12+ 构建和验证 DMG。GitHub Actions 的 `Build macOS` 工作流在两种架构的 macOS 机器上分别执行并上传产物。
+
+```sh
+npm ci
+npm run build:macos
+npx tsx tools/verify-macos.ts .local/releases/Codex-Go-0.4.0-macOS-$(node -p 'process.arch').dmg
+```
+
+验证脚本会挂载 DMG，检查应用版本、签名和二进制架构，再运行打包后的应用。测试使用临时项目，检查 Codex 启动、桌面退出后后台可访问和项目创建。
+
+Windows 和 Android 构建需要 Node 22.12+、Python 3.11+、curl。Android 还需要 JDK 17、Android SDK 34，处理 Ubuntu deb 时需要 Python `zstandard`。生成物和机器路径已加入忽略规则。
 
 ```powershell
 npm ci

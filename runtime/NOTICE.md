@@ -32,12 +32,13 @@ installer and lifecycle implementation; dsh-Go executable code is not bundled.
 `ubuntu-arm64.lock.json` records Ubuntu package facts; the Ubuntu binaries retain
 their individual upstream copyright/license files.
 
-Cloudflared 2026.10.7 (Apache-2.0) accompanies the Windows app. Its official release
-SHA-256 is fixed in `tools/build-native.mjs` and verified at build and launch.
-Electron includes its own license and Chromium notices in the Windows distribution.
+Cloudflared 2026.10.7 (Apache-2.0) accompanies the Windows and macOS apps. The build
+checks the official download against `cloudflared.lock.json` and embeds the
+executable's SHA-256 for verification before launch. Electron includes its license
+and Chromium notices in both desktop distributions.
 
-The Windows QR renderer bundles qrcode 1.5.4 (MIT), by Ryan Day and contributors:
-https://github.com/soldair/node-qrcode . Its license accompanies the Windows app
+The desktop QR renderer bundles qrcode 1.5.4 (MIT), by Ryan Day and contributors:
+https://github.com/soldair/node-qrcode . Its license accompanies each desktop app
 in resources/licenses/qrcode-LICENSE.txt.
 
 Android camera scanning uses ZXing Android Embedded 4.3.0 and ZXing Core,

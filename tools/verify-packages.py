@@ -63,7 +63,8 @@ def main():
             assert name in windows.namelist(), name
         assert windows.read('resources/web/index.html') == (ROOT / 'dist/web/index.html').read_bytes()
         assert windows.read('resources/agent.mjs') == (ROOT / 'dist/native/resources/agent.mjs').read_bytes()
-        assert hashlib.sha256(windows.read('resources/cloudflared.exe')).hexdigest() == '2493dbc168923bb3e59e5e7716f71deced92992eea9acd6e9d74f84ac7751343'
+        cloud_pin = json.loads((ROOT / 'runtime' / 'cloudflared.lock.json').read_text(encoding='utf-8'))['win32-x64']
+        assert hashlib.sha256(windows.read('resources/cloudflared.exe')).hexdigest() == cloud_pin['sha256']
     names = [f'Codex-Go-{VERSION}-Windows-x64.exe', f'Codex-Go-{VERSION}-Windows-x64.zip', f'Codex-Go-{VERSION}-Android-arm64.apk']
     artifacts = [{'name': name, 'bytes': (RELEASE / name).stat().st_size,
                   'sha256': digest(RELEASE / name)} for name in names]

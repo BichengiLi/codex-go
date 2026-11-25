@@ -7,7 +7,7 @@ import {
   session,
 } from "electron";
 import path from "node:path";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { agentRequest, controlAddress } from "./control.js";
@@ -21,7 +21,7 @@ let token = "",
 let polling: ReturnType<typeof setInterval> | undefined;
 const resources = app.isPackaged
   ? process.resourcesPath
-  : path.resolve("dist/native/resources");
+  : path.join(import.meta.dirname, "resources");
 const request = (action: string, value?: string) =>
   agentRequest(address, token, action, value);
 
@@ -36,7 +36,15 @@ async function ensureAgent() {
   if (token) {
     try {
       return await request("state");
-    } catch {}
+    } catch (error) {
+      // A process killed before closing its Unix socket leaves an unusable path.
+      if (
+        process.platform !== "win32" &&
+        (error as NodeJS.ErrnoException).code === "ECONNREFUSED"
+      ) {
+        await unlink(address).catch(() => {});
+      }
+    }
   }
   token ||= randomBytes(32).toString("hex");
   let workspace = path.join(app.getPath("documents"), "CodexGo");

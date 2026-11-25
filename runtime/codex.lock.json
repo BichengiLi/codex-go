@@ -2,7 +2,20 @@
   "win32-x64": {
     "version": "0.166.0-alpha.5.1-win32-x64",
     "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.166.0-alpha.5.1-win32-x64.tgz",
-    "integrity": "sha512-r+Z7OZ+YrkaLY6L4kn1GLwApOr+LNtH0427+uUQ17K9n69enfwOVur1AaCgCJWFfFOsZHaf+3ZLrmgIzsDik4A=="
+    "integrity": "sha512-r+Z7OZ+YrkaLY6L4kn1GLwApOr+LNtH0427+uUQ17K9n69enfwOVur1AaCgCJWFfFOsZHaf+3ZLrmgIzsDik4A==",
+    "vendor": "x86_64-pc-windows-msvc"
+  },
+  "darwin-arm64": {
+    "version": "0.166.0-alpha.5.1-darwin-arm64",
+    "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.166.0-alpha.5.1-darwin-arm64.tgz",
+    "integrity": "sha512-j5FXx3pJ5301+Q8sL6hGUNoHLvPBXvViKboFnFFWE2asaoEBxU1v2j+G1P7H42PvaqHfKWd331J4zYSidLQPnw==",
+    "vendor": "aarch64-apple-darwin"
+  },
+  "darwin-x64": {
+    "version": "0.166.0-alpha.5.1-darwin-x64",
+    "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.166.0-alpha.5.1-darwin-x64.tgz",
+    "integrity": "sha512-sKTrTNcfdl2rV6ST4o2J1icBMZ4JPhT+HajBbKaGHkvltufmjuI7C/l/lMT17oFPyo0lKpufW0q6s3deQlQAkg==",
+    "vendor": "x86_64-apple-darwin"
   },
   "linux-arm64": {
     "version": "0.166.0-alpha.5.1-linux-arm64",

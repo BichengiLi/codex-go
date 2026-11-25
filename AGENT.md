@@ -1,5 +1,7 @@
 # Codex Go 二次开发交接
 
+**0.4.0 macOS 预览**提供 Apple 芯片和 Intel DMG。桌面入口复用 Electron 界面和现有配对协议，构建见 [App 指南](docs/native-apps.md#构建)。Android 源码同步为 versionCode 6，已发布的 Windows 和 Android 安装包为 0.3.2。
+
 **2026-11-02 / 0.3.2 更新**：Android 旧运行环境的 PRoot 绑定占位目录可能为 `000` 权限，升级清理 `runtime-backup` 时因此失败。删除旧环境前恢复目录所有者访问权限，继续禁止跟随符号链接；持久 `home` 保留。Android versionCode 5，双端版本同步为 0.3.2。手机覆盖升级、本地引擎启动和既有数据保留已实测；验证见 [0.3.2 验证记录](docs/validation-0.3.2.md)，下载见 [v0.3.2](https://github.com/BichengiLi/codex-go/releases/tag/v0.3.2)，更新说明见 [发布说明](docs/release-0.3.2.md)。
 
 本文件是开发交接主文档，标准自动发现入口为 [AGENTS.md](AGENTS.md)。下面的状态基线为 **2026-10-31 / 0.2.0 双端体验更新**；开始新任务时以当前源码、锁文件、CI 和设备实测更新判断。
