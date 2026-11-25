@@ -37,6 +37,7 @@ async function verifyHost(executable: string, directory: string) {
     stdio: ["ignore", "ignore", "inherit"],
   });
   let guiError: Error | undefined;
+  let lastConnectionError = "";
   const closed = once(gui, "close").catch((error: Error) => { guiError = error; });
   try {
     for (let attempt = 0; attempt < 150; attempt++) {
@@ -45,11 +46,16 @@ async function verifyHost(executable: string, directory: string) {
         token ||= JSON.parse(await readFile(path.join(userData, "agent.json"), "utf8")).token;
         agent = await request<AgentState>("state");
         if (agent.online && !agent.busy) break;
-      } catch {}
+      } catch (error) {
+        lastConnectionError = error instanceof Error ? error.message : String(error);
+      }
       await delay(200);
     }
     if (guiError) throw guiError;
-    assert.ok(agent?.online, agent?.error || "The packaged GUI did not start an online Codex host");
+    assert.ok(
+      agent?.online && !agent.busy,
+      `The packaged GUI did not start an online Codex host. ${agent?.error || lastConnectionError}`,
+    );
 
     gui.kill();
     await closed;
